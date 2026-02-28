@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>BlueBulb Group — Data Flow BPMN</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#f5f6fa;font-family:'IBM Plex Sans',sans-serif;color:#1a1d2e}
+
+  .page-header{
+    background:#fff;border-bottom:1px solid #e2e5ef;
+    padding:18px 32px;display:flex;align-items:center;justify-content:space-between;
+    position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,0.06);
+  }
+  .page-header h1{font-size:16px;font-weight:700;color:#1a1d2e}
+  .page-header .sub{font-size:11px;color:#6b7280;margin-top:2px}
+  .badge{font-size:10px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;
+    border-radius:20px;padding:3px 10px;font-weight:600}
+
+  .diagram-wrap{padding:28px 32px;overflow-x:auto}
+
+  /* Legend */
+  .legend{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:20px;
+    background:#fff;border:1px solid #e2e5ef;border-radius:8px;
+    padding:12px 18px;font-size:11px;color:#374151}
+  .legend-item{display:flex;align-items:center;gap:7px}
+  .l-start{width:16px;height:16px;border-radius:50%;background:#16a34a;flex-shrink:0}
+  .l-end  {width:16px;height:16px;border-radius:50%;background:#dc2626;border:3px solid #dc262655;flex-shrink:0}
+  .l-task {width:22px;height:14px;border:2px solid #3730a3;border-radius:3px;background:#eef2ff;flex-shrink:0}
+  .l-gw   {width:16px;height:16px;transform:rotate(45deg);background:#fef9c3;border:2px solid #ca8a04;flex-shrink:0}
+  .l-db   {width:22px;height:14px;border:2px solid #0a7c7c;border-radius:0 0 50% 50% / 0 0 6px 6px;background:#f0fdfa;flex-shrink:0}
+  .l-seq  {width:30px;height:2px;background:#6b7280;position:relative;flex-shrink:0}
+  .l-seq::after{content:'';position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left:8px solid #6b7280}
+  .l-msg  {width:30px;height:2px;background:#a855f7;border-top:2px dashed #a855f7;position:relative;flex-shrink:0}
+  .l-msg::after{content:'';position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left:8px solid #a855f7}
+
+  svg{display:block}
+
+  /* Tooltip */
+  .tooltip{position:fixed;background:#1a1d2e;color:#fff;border-radius:7px;
+    padding:9px 13px;font-size:11px;line-height:1.5;pointer-events:none;
+    opacity:0;transition:opacity 0.15s;z-index:999;max-width:260px;
+    box-shadow:0 4px 16px rgba(0,0,0,0.25)}
+  .tooltip.show{opacity:1}
+  .tooltip strong{display:block;font-size:12px;margin-bottom:3px;color:#fbbf24}
+
+  .controls{display:flex;gap:8px;margin-bottom:16px}
+  .ctrl-btn{background:#fff;border:1px solid #e2e5ef;border-radius:6px;
+    padding:6px 14px;font-size:12px;font-weight:500;cursor:pointer;
+    color:#374151;transition:all 0.15s;font-family:inherit}
+  .ctrl-btn:hover{background:#f0f4ff;border-color:#c7d2fe;color:#3730a3}
+  .ctrl-btn.active{background:#3730a3;border-color:#3730a3;color:#fff}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div>
+    <h1>BlueBulb Group — Data Movement BPMN</h1>
+    <div class="sub">Subsidiary Data Entry → Data Warehouse → Group Dashboard · Hover any element for detail</div>
+  </div>
+  <span class="badge">BPMN 2.0</span>
+</div>
+
+<div class="diagram-wrap">
+  <div class="legend">
+    <div class="legend-item"><div class="l-start"></div> Start Event</div>
+    <div class="legend-item"><div class="l-end"></div> End Event</div>
+    <div class="legend-item"><div class="l-task"></div> Task / Activity</div>
+    <div class="legend-item"><div class="l-gw"></div> Gateway (Decision)</div>
+    <div class="legend-item"><div class="l-db"></div> Data Store</div>
+    <div class="legend-item"><div class="l-seq"></div> Sequence Flow</div>
+    <div class="legend-item"><div class="l-msg"></div> Message Flow</div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn active" id="zoomFit">Fit View</button>
+    <button class="ctrl-btn" id="zoomIn">+ Zoom In</button>
+    <button class="ctrl-btn" id="zoomOut">− Zoom Out</button>
+    <button class="ctrl-btn" id="resetBtn">Reset</button>
+  </div>
+
+  <div id="svgContainer" style="overflow:auto;border:1px solid #e2e5ef;border-radius:10px;background:#fff;max-height:82vh">
+  <svg id="bpmn" xmlns="http://www.w3.org/2000/svg" width="2020" height="1060"
+       viewBox="0 0 2020 1060" style="min-width:900px">
+
+  <defs>
+    <!-- Arrow markers -->
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 Z" fill="#6b7280"/>
+    </marker>
+    <marker id="arr-purple" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 Z" fill="#a855f7"/>
+    </marker>
+    <marker id="arr-red" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 Z" fill="#dc2626"/>
+    </marker>
+    <marker id="arr-green" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 Z" fill="#16a34a"/>
+    </marker>
+    <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 Z" fill="#2563eb"/>
+    </marker>
+
+    <!-- Drop shadow -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="#0001"/>
+    </filter>
+    <filter id="shadow-lane" x="-2%" y="-2%" width="104%" height="104%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#0002"/>
+    </filter>
+  </defs>
+
+  <!-- ══════════════════ POOL BACKGROUND ══════════════════ -->
+  <!-- Pool border -->
+  <rect x="10" y="10" width="2000" height="1040" rx="8" ry="8"
+        fill="#f8f9fc" stroke="#cbd5e1" stroke-width="1.5"/>
+
+  <!-- Pool label -->
+  <rect x="10" y="10" width="38" height="1040" rx="8" ry="8" fill="#1a1d2e"/>
+  <text transform="translate(29,530) rotate(-90)" text-anchor="middle"
+        font-family="IBM Plex Sans" font-size="13" font-weight="700" fill="#fff" letter-spacing="1">
+    BLUEBULB GROUP — DATA MOVEMENT PIPELINE
+  </text>
+
+  <!-- ══════════════════ SWIMLANE 1: SUBSIDIARY STAFF ══════════════════ -->
+  <rect x="48" y="10" width="1962" height="185" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
+  <rect x="48" y="10" width="110" height="185" fill="#dbeafe" stroke="#bfdbfe" stroke-width="1"/>
+  <text transform="translate(103,102) rotate(-90)" text-anchor="middle"
+        font-family="IBM Plex Sans" font-size="11" font-weight="600" fill="#1e40af" letter-spacing="0.3">
+    SUBSIDIARY STAFF
+  </text>
+
+  <!-- ══════════════════ SWIMLANE 2: SUBSIDIARY SYSTEM ══════════════════ -->
+  <rect x="48" y="195" width="1962" height="185" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1"/>
+  <rect x="48" y="195" width="110" height="185" fill="#dcfce7" stroke="#bbf7d0" stroke-width="1"/>
+  <text transform="translate(103,287) rotate(-90)" text-anchor="middle"
+        font-family="IBM Plex Sans" font-size="11" font-weight="600" fill="#15803d" letter-spacing="0.3">
+    SUBSIDIARY SYSTEM
+  </text>
+
+  <!-- ══════════════════ SWIMLANE 3: DATA WAREHOUSE ══════════════════ -->
+  <rect x="48" y="380" width="1962" height="185" fill="#fdf4ff" stroke="#e9d5ff" stroke-width="1"/>
+  <rect x="48" y="380" width="110" height="185" fill="#f3e8ff" stroke="#e9d5ff" stroke-width="1"/>
+  <text transform="translate(103,472) rotate(-90)" text-anchor="middle"
+        font-family="IBM Plex Sans" font-size="11" font-weight="600" fill="#7e22ce" letter-spacing="0.3">
+    GROUP DATA WAREHOUSE
+  </text>
+
+  <!-- ══════════════════ SWIMLANE 4: ETL / PIPELINE ══════════════════ -->
+  <rect x="48" y="565" width="1962" height="185" fill="#fffbeb" stroke="#fde68a" stroke-width="1"/>
+  <rect x="48" y="565" width="110" height="185" fill="#fef3c7" stroke="#fde68a" stroke-width="1"/>
+  <text transform="translate(103,657) rotate(-90)" text-anchor="middle"
+        font-family="IBM Plex Sans" font-size="11" font-weight="600" fill="#92400e" letter-spacing="0.3">
+    ETL / DATA PIPELINE
+  </text>
+
+  <!-- ══════════════════ SWIMLANE 5: BA / ANALYST ══════════════════ -->
+  <rect x="48" y="750" width="1962" height="150" fill="#fef2f2" stroke="#fecaca" stroke-width="1"/>
+  <rect x="48" y="750" width="110" height="150" fill="#fee2e2" stroke="#fecaca" stroke-width="1"/>
+  <text transform="translate(103,825) rotate(-90)" text-anchor="middle"
+        font-family="IBM Plex Sans" font-size="11" font-weight="600" fill="#991b1b" letter-spacing="0.3">
+    BA / DATA ANALYST
+  </text>
+
+  <!-- ══════════════════ SWIMLANE 6: GROUP DASHBOARD ══════════════════ -->
+  <rect x="48" y="900" width="1962" height="150" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1"/>
+  <rect x="48" y="900" width="110" height="150" fill="#dcfce7" stroke="#bbf7d0" stroke-width="1"/>
+  <text transform="translate(103,975) rotate(-90)" text-anchor="middle"
+        font-family="IBM Plex Sans" font-size="11" font-weight="600" fill="#166534" letter-spacing="0.3">
+    GROUP DASHBOARD (CEO)
+  </text>
+
+  <!-- ══════════════════════════════════════════════════════
+       LANE 1: SUBSIDIARY STAFF ELEMENTS
+  ══════════════════════════════════════════════════════ -->
+
+  <!-- START: Operational data generated -->
+  <circle cx="195" cy="102" r="18" fill="#16a34a" filter="url(#shadow)"
+    class="bpmn-el" data-title="Start Event: Operational Data Generated"
+    data-info="A business event triggers data entry — e.g. daily transaction settlement, loan disbursement, delivery completion, or monthly management accounts. Each subsidiary generates this data independently through their own operational systems."/>
+  <circle cx="195" cy="102" r="14" fill="none" stroke="#fff" stroke-width="1.5"/>
+  <text x="195" y="136" text-anchor="middle" font-size="9" fill="#15803d" font-weight="600">Data Generated</text>
+
+  <!-- TASK: Staff enters data into local system -->
+  <rect x="245" y="70" width="130" height="64" rx="6" fill="#fff" stroke="#3730a3" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Staff Enters Data into Local System"
+    data-info="Subsidiary staff (finance, operations, relationship managers) enter transactional data into their local system — this could be a core banking system (Dynasty MFB), an ERP, a logistics platform (Rabafast), or Excel-based tracking (Dealmakers, Chrisborough). This is the primary data entry point."/>
+  <text x="310" y="96" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Enter Data into</text>
+  <text x="310" y="110" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Local System</text>
+  <text x="310" y="124" text-anchor="middle" font-size="9" fill="#6b7280">(CBS / ERP / Excel)</text>
+
+  <!-- GATEWAY: Data complete? -->
+  <polygon points="455,102 480,75 505,102 480,129" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Gateway: Data Complete &amp; Valid?"
+    data-info="A completeness check — either automated (system validation) or manual (team lead review). Checks that required fields are populated, values are within expected ranges, and mandatory records are not missing. For regulated entities (Dynasty MFB, ZidaKredit), this includes format compliance checks."/>
+  <text x="480" y="148" text-anchor="middle" font-size="9" fill="#92400e" font-weight="600">Complete</text>
+  <text x="480" y="159" text-anchor="middle" font-size="9" fill="#92400e" font-weight="600">&amp; Valid?</text>
+
+  <!-- No path: correct and resubmit -->
+  <rect x="540" y="70" width="120" height="64" rx="6" fill="#fff" stroke="#dc2626" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Correct &amp; Resubmit Data"
+    data-info="If data fails validation, the entry is returned to staff with error flags. Common issues: missing transaction codes, mismatched period dates, values outside tolerance bands, or incomplete KYB fields. Staff corrects and resubmits — this loop continues until validation passes."/>
+  <text x="600" y="97" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Correct &amp;</text>
+  <text x="600" y="111" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Resubmit Data</text>
+  <text x="600" y="125" text-anchor="middle" font-size="9" fill="#dc2626">← Error Loop</text>
+
+  <!-- TASK: Manager approves / locks period -->
+  <rect x="700" y="70" width="130" height="64" rx="6" fill="#fff" stroke="#3730a3" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Manager Approves &amp; Locks Period"
+    data-info="Once data is validated, the subsidiary finance manager or team lead approves the data entry and locks the reporting period. This prevents retroactive changes and creates an audit trail. For financial data, this is the formal 'sign-off' step before transmission to Group level."/>
+  <text x="765" y="96" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Manager Approves</text>
+  <text x="765" y="110" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">&amp; Locks Period</text>
+  <text x="765" y="124" text-anchor="middle" font-size="9" fill="#6b7280">(Audit Trail Created)</text>
+
+
+  <!-- ══════════════════════════════════════════════════════
+       LANE 2: SUBSIDIARY SYSTEM
+  ══════════════════════════════════════════════════════ -->
+
+  <!-- DATA STORE: Subsidiary local DB -->
+  <ellipse cx="310" cy="268" rx="55" ry="12" fill="#f0fdfa" stroke="#0a7c7c" stroke-width="1.5"/>
+  <rect x="255" y="255" width="110" height="26" fill="#f0fdfa" stroke="#0a7c7c" stroke-width="1.5"/>
+  <ellipse cx="310" cy="281" rx="55" ry="12" fill="#f0fdfa" stroke="#0a7c7c" stroke-width="1.5"/>
+  <text x="310" y="272" text-anchor="middle" font-size="9" fill="#0a7c7c" font-weight="700">Subsidiary</text>
+  <text x="310" y="283" text-anchor="middle" font-size="9" fill="#0a7c7c" font-weight="700">Local Database</text>
+  <text x="310" y="305" text-anchor="middle" font-size="8" fill="#6b7280">(CBS / ERP / Excel)</text>
+
+  <!-- TASK: System generates structured extract -->
+  <rect x="550" y="228" width="135" height="64" rx="6" fill="#fff" stroke="#3730a3" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: System Generates Structured Data Extract"
+    data-info="The subsidiary's system produces a structured data extract — typically a scheduled SQL export, API response, or formatted CSV. The extract follows a standardised schema defined by the Group Data Warehouse team. Frequency: daily for financial/transactions, weekly for operational KPIs, monthly for compliance data."/>
+  <text x="617" y="251" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Generate</text>
+  <text x="617" y="265" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Structured Extract</text>
+  <text x="617" y="279" text-anchor="middle" font-size="9" fill="#6b7280">SQL / CSV / API</text>
+
+  <!-- TASK: Apply data schema & format rules -->
+  <rect x="720" y="228" width="130" height="64" rx="6" fill="#fff" stroke="#3730a3" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Apply Group Data Schema &amp; Format Rules"
+    data-info="Each subsidiary's extract is mapped to the Group's unified data schema. Field names are standardised (e.g. 'revenue' becomes 'gross_revenue_ngn'), currencies are tagged, date formats aligned to ISO 8601, and subsidiary identifiers added. This schema enforcement is what makes cross-subsidiary comparison possible."/>
+  <text x="785" y="252" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Apply Group</text>
+  <text x="785" y="266" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Data Schema</text>
+  <text x="785" y="280" text-anchor="middle" font-size="9" fill="#6b7280">(Field Mapping)</text>
+
+  <!-- TASK: Transmit to warehouse -->
+  <rect x="890" y="228" width="130" height="64" rx="6" fill="#fff" stroke="#3730a3" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Transmit Extract to Group Data Warehouse"
+    data-info="The formatted extract is transmitted to the Group Data Warehouse via a secure channel — SFTP, encrypted API endpoint, or direct database replication. Each transmission is timestamped and logged. Failed transmissions trigger automatic retry (3 attempts) then alert to the Data Pipeline team."/>
+  <text x="955" y="252" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Transmit to</text>
+  <text x="955" y="266" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Group Warehouse</text>
+  <text x="955" y="280" text-anchor="middle" font-size="9" fill="#6b7280">(SFTP / API / Replication)</text>
+
+
+  <!-- ══════════════════════════════════════════════════════
+       LANE 3: GROUP DATA WAREHOUSE
+  ══════════════════════════════════════════════════════ -->
+
+  <!-- TASK: Ingest & validate incoming data -->
+  <rect x="890" y="415" width="130" height="64" rx="6" fill="#fff" stroke="#7e22ce" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Ingest &amp; Validate Incoming Data"
+    data-info="The Data Warehouse ingestion layer receives the transmission and runs automated validation rules: row count checks, null value audits, referential integrity checks, and range validation (e.g. NPL ratio cannot exceed 100%). Data that passes enters the staging area; failed data triggers an exception log."/>
+  <text x="955" y="439" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Ingest &amp; Validate</text>
+  <text x="955" y="453" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Incoming Data</text>
+  <text x="955" y="467" text-anchor="middle" font-size="9" fill="#6b7280">(Staging Area)</text>
+
+  <!-- GATEWAY: Passes warehouse validation? -->
+  <polygon points="1075,447 1100,420 1125,447 1100,474" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Gateway: Passes Warehouse Validation?"
+    data-info="A data quality gate. The warehouse runs automated checks across all incoming subsidiary data before it enters the core data model. Rules include: no duplicate submissions for same period, values consistent with prior periods (outlier detection), mandatory fields present, and foreign key integrity maintained."/>
+  <text x="1100" y="493" text-anchor="middle" font-size="9" fill="#92400e" font-weight="600">Passes</text>
+  <text x="1100" y="504" text-anchor="middle" font-size="9" fill="#92400e" font-weight="600">Validation?</text>
+
+  <!-- TASK: Flag exception & notify -->
+  <rect x="1145" y="415" width="125" height="64" rx="6" fill="#fff" stroke="#dc2626" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Flag Exception &amp; Notify Subsidiary"
+    data-info="If warehouse validation fails, an exception record is written to the error log with the specific failure reason, subsidiary ID, reporting period, and timestamp. An automated notification is sent to the subsidiary's data contact and the Group Data Analyst. The failed batch is quarantined in the exception queue for manual review."/>
+  <text x="1208" y="439" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Flag Exception</text>
+  <text x="1208" y="453" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">&amp; Notify</text>
+  <text x="1208" y="467" text-anchor="middle" font-size="9" fill="#dc2626">(Exception Queue)</text>
+
+  <!-- DATA STORE: Warehouse core tables -->
+  <ellipse cx="1340" cy="428" rx="60" ry="12" fill="#f3e8ff" stroke="#7e22ce" stroke-width="1.5"/>
+  <rect x="1280" y="415" width="120" height="28" fill="#f3e8ff" stroke="#7e22ce" stroke-width="1.5"/>
+  <ellipse cx="1340" cy="443" rx="60" ry="12" fill="#f3e8ff" stroke="#7e22ce" stroke-width="1.5"/>
+  <text x="1340" y="434" text-anchor="middle" font-size="9" fill="#7e22ce" font-weight="700">Group DW</text>
+  <text x="1340" y="447" text-anchor="middle" font-size="9" fill="#7e22ce" font-weight="700">Core Tables</text>
+  <text x="1340" y="468" text-anchor="middle" font-size="8" fill="#6b7280">(Fact &amp; Dimension)</text>
+
+  <!-- TASK: Write to DW dimension/fact tables -->
+  <rect x="1160" y="415" width="1" height="1" fill="none"/> <!-- spacer -->
+
+  <!-- Actually: write to DW -->
+  <rect x="1400" y="415" width="130" height="64" rx="6" fill="#fff" stroke="#7e22ce" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Write to Fact &amp; Dimension Tables"
+    data-info="Validated data is written into the warehouse's star schema. Fact tables hold transactional/metric data (e.g. fact_revenue, fact_loans, fact_deliveries). Dimension tables hold reference data (dim_subsidiary, dim_time, dim_currency). Historical records are preserved via slowly-changing dimension (SCD) logic so trend analysis is always available."/>
+  <text x="1465" y="439" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Write to Fact &amp;</text>
+  <text x="1465" y="453" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Dimension Tables</text>
+  <text x="1465" y="467" text-anchor="middle" font-size="9" fill="#6b7280">(Star Schema / SCD)</text>
+
+  <!-- TASK: Update data freshness log -->
+  <rect x="1560" y="415" width="130" height="64" rx="6" fill="#fff" stroke="#7e22ce" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Update Data Freshness &amp; Lineage Log"
+    data-info="After successful write, the warehouse updates the data catalogue with: last_updated timestamp per subsidiary per metric, data lineage record (source system → extract → warehouse table), row counts, and data completeness score. This log is visible on the dashboard as 'Last Refreshed' timestamps and enables trust in the data."/>
+  <text x="1625" y="439" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Update Freshness</text>
+  <text x="1625" y="453" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">&amp; Lineage Log</text>
+  <text x="1625" y="467" text-anchor="middle" font-size="9" fill="#6b7280">(Data Catalogue)</text>
+
+
+  <!-- ══════════════════════════════════════════════════════
+       LANE 4: ETL / PIPELINE
+  ══════════════════════════════════════════════════════ -->
+
+  <!-- TASK: Scheduled ETL job triggers -->
+  <rect x="1560" y="600" width="130" height="64" rx="6" fill="#fff" stroke="#92400e" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Scheduled ETL Job Triggers"
+    data-info="An automated scheduler (e.g. Apache Airflow, Azure Data Factory, or cron job) triggers the ETL process at defined intervals: real-time streaming for transaction data, hourly for cash positions, nightly for full metric refresh. The trigger is time-based or event-based (e.g. triggered when a new DW write completes)."/>
+  <text x="1625" y="624" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Scheduled ETL</text>
+  <text x="1625" y="638" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Job Triggers</text>
+  <text x="1625" y="652" text-anchor="middle" font-size="9" fill="#6b7280">(Airflow / ADF)</text>
+
+  <!-- TASK: Transform & aggregate metrics -->
+  <rect x="1720" y="600" width="130" height="64" rx="6" fill="#fff" stroke="#92400e" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Transform &amp; Aggregate Metrics"
+    data-info="SQL transformations aggregate raw fact data into the business metrics needed for the dashboard. Examples: GROUP BY subsidiary to compute total revenue; calculate NPL ratio (non-performing / total portfolio); compute MoM growth rates; apply FX rates to convert foreign currency positions to NGN equivalent. These transforms produce the 'semantic layer' the dashboard reads from."/>
+  <text x="1785" y="624" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Transform &amp;</text>
+  <text x="1785" y="638" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Aggregate Metrics</text>
+  <text x="1785" y="652" text-anchor="middle" font-size="9" fill="#6b7280">(SQL / dbt models)</text>
+
+  <!-- TASK: Load to reporting layer -->
+  <rect x="1870" y="600" width="115" height="64" rx="6" fill="#fff" stroke="#92400e" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Load to Reporting / Semantic Layer"
+    data-info="The aggregated metrics are loaded into the reporting layer — a set of materialised views, Power BI datasets, or a semantic model (e.g. SSAS tabular model / Power BI Premium dataset). This is the layer the dashboard directly queries. Loading is incremental where possible to avoid full refresh delays."/>
+  <text x="1928" y="624" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Load to</text>
+  <text x="1928" y="638" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Reporting Layer</text>
+  <text x="1928" y="652" text-anchor="middle" font-size="9" fill="#6b7280">(Power BI Dataset)</text>
+
+
+  <!-- ══════════════════════════════════════════════════════
+       LANE 5: BA / DATA ANALYST
+  ══════════════════════════════════════════════════════ -->
+
+  <!-- TASK: BA reviews data quality report -->
+  <rect x="1560" y="785" width="130" height="64" rx="6" fill="#fff" stroke="#991b1b" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: BA Reviews Daily Data Quality Report"
+    data-info="Every morning the BA/Data Analyst reviews an automated data quality report showing: which subsidiaries submitted data on time, any validation exceptions, completeness scores per metric, and anomaly flags (values that deviate significantly from trend). This is the human quality gate before the dashboard is trusted by executives."/>
+  <text x="1625" y="809" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Review Data</text>
+  <text x="1625" y="823" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Quality Report</text>
+  <text x="1625" y="837" text-anchor="middle" font-size="9" fill="#6b7280">(Daily QA Check)</text>
+
+  <!-- GATEWAY: Anomalies detected? -->
+  <polygon points="1720,817 1745,790 1770,817 1745,844" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Gateway: Anomalies or Missing Data Detected?"
+    data-info="If the BA identifies anomalies (e.g. a subsidiary's revenue dropped 80% overnight, or NPL ratio spiked beyond plausible range), they investigate. Likely causes: data entry error, late submission, system outage, or a genuine business event requiring explanation. Missing data from a subsidiary also triggers this path."/>
+  <text x="1745" y="862" text-anchor="middle" font-size="9" fill="#92400e" font-weight="600">Anomaly</text>
+  <text x="1745" y="873" text-anchor="middle" font-size="9" fill="#92400e" font-weight="600">Detected?</text>
+
+  <!-- TASK: Investigate & resolve with subsidiary -->
+  <rect x="1800" y="785" width="130" height="64" rx="6" fill="#fff" stroke="#dc2626" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Investigate &amp; Resolve with Subsidiary"
+    data-info="The BA contacts the subsidiary's data owner to investigate the anomaly. Resolution paths: subsidiary resubmits corrected data, BA applies an approved adjustment with audit note, or the value is flagged as 'under review' on the dashboard (shown in amber) until resolved. All adjustments are documented in the lineage log."/>
+  <text x="1865" y="809" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Investigate &amp;</text>
+  <text x="1865" y="823" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Resolve</text>
+  <text x="1865" y="837" text-anchor="middle" font-size="9" fill="#dc2626">(Subsidiary Contact)</text>
+
+  <!-- TASK: Approve data for dashboard -->
+  <rect x="1870" y="785" width="1" height="1" fill="none"/>
+
+  <!-- Mark data as dashboard-ready -->
+  <rect x="1550" y="785" width="1" height="1" fill="none"/>
+
+  <!-- Actually: Approve and publish -->
+  <rect x="1400" y="785" width="130" height="64" rx="6" fill="#fff" stroke="#991b1b" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Approve &amp; Mark Data Dashboard-Ready"
+    data-info="Once the BA is satisfied that data is accurate, they mark the dataset as 'dashboard-ready' in the data catalogue. This is a formal approval step — the dashboard displays a 'Last Verified By' timestamp alongside the 'Last Refreshed' timestamp so executives can see both when the data was received and when it was human-verified."/>
+  <text x="1465" y="809" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Approve &amp; Mark</text>
+  <text x="1465" y="823" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Dashboard-Ready</text>
+  <text x="1465" y="837" text-anchor="middle" font-size="9" fill="#16a34a">(QA Sign-off)</text>
+
+
+  <!-- ══════════════════════════════════════════════════════
+       LANE 6: GROUP DASHBOARD (CEO)
+  ══════════════════════════════════════════════════════ -->
+
+  <!-- TASK: Dashboard refreshes automatically -->
+  <rect x="1400" y="930" width="130" height="64" rx="6" fill="#fff" stroke="#166534" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: Dashboard Auto-Refreshes from Reporting Layer"
+    data-info="The Group Dashboard (Power BI) is configured to auto-refresh from the reporting layer at defined intervals — real-time for cash positions and alerts, every 15 mins for transaction volumes, nightly for full subsidiary KPI refresh. Incremental refresh ensures only changed data is reloaded, keeping the dashboard fast."/>
+  <text x="1465" y="954" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Dashboard</text>
+  <text x="1465" y="968" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Auto-Refreshes</text>
+  <text x="1465" y="982" text-anchor="middle" font-size="9" fill="#6b7280">(Power BI Scheduled)</text>
+
+  <!-- TASK: CEO views group intelligence -->
+  <rect x="1560" y="930" width="130" height="64" rx="6" fill="#fff" stroke="#166534" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: CEO Views Group Intelligence Dashboard"
+    data-info="The Group CEO opens the dashboard to see: consolidated performance across all 8 subsidiaries, the 5 CEO questions answered in real time, active compliance alerts, NPL early warning, and Orbita adoption tracking. All data on screen has passed through the full pipeline: entry → validation → warehouse → ETL → BA approval → dashboard."/>
+  <text x="1625" y="954" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">CEO Views Group</text>
+  <text x="1625" y="968" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Intelligence</text>
+  <text x="1625" y="982" text-anchor="middle" font-size="9" fill="#166534">(5 CEO Questions)</text>
+
+  <!-- TASK: CEO drills down to subsidiary -->
+  <rect x="1720" y="930" width="130" height="64" rx="6" fill="#fff" stroke="#166534" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Task: CEO Drills Down to Subsidiary Detail"
+    data-info="The CEO can click through from the Group Overview to any individual subsidiary's detail view — seeing KPIs, revenue trend, risk items, and compliance status for that entity specifically. This drill-through capability is only possible because data is stored at the grain of subsidiary × period × metric in the warehouse."/>
+  <text x="1785" y="954" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Drill Down to</text>
+  <text x="1785" y="968" text-anchor="middle" font-size="10" fill="#1a1d2e" font-weight="600">Subsidiary Detail</text>
+  <text x="1785" y="982" text-anchor="middle" font-size="9" fill="#6b7280">(Click-Through)</text>
+
+  <!-- GATEWAY: Action required? -->
+  <polygon points="1890,962 1915,935 1940,962 1915,989" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.8"
+    filter="url(#shadow)" class="bpmn-el"
+    data-title="Gateway: Action Required?"
+    data-info="The CEO reviews the dashboard alerts. If no action is required (all green), the session ends as a monitoring activity. If an alert requires action (amber/red) — e.g. Tax Reform filing due in 7 days, Orbita adoption below target, NPL approaching threshold — the CEO initiates a decision or delegates to the relevant SMU team member."/>
+  <text x="1915" y="1007" text-anchor="middle" font-size="9" fill="#92400e" font-weight="600">Action</text>
+  <text x="1915" y="1018" text-anchor="middle" font-size="9" fill="#92400e" font-weight="600">Required?</text>
+
+  <!-- END: No action needed -->
+  <circle cx="1990" cy="962" r="16" fill="#fff" stroke="#dc2626" stroke-width="3"
+    class="bpmn-el" data-title="End Event: Monitoring Complete"
+    data-info="If no action items require CEO intervention, the monitoring cycle ends. The dashboard continues refreshing automatically. The next cycle begins when the next scheduled data submission is due from subsidiaries."/>
+  <circle cx="1990" cy="962" r="10" fill="#dc2626"/>
+  <text x="1990" y="990" text-anchor="middle" font-size="9" fill="#dc2626" font-weight="600">Monitoring</text>
+  <text x="1990" y="1001" text-anchor="middle" font-size="9" fill="#dc2626" font-weight="600">Complete</text>
+
+  <!-- END: Action delegated -->
+  <circle cx="1990" cy="1030" r="16" fill="#fff" stroke="#dc2626" stroke-width="3"
+    class="bpmn-el" data-title="End Event: Action Delegated to SMU"
+    data-info="If the dashboard surfaces an alert requiring action, the CEO delegates to the relevant SMU role: BA/Data Analyst for data issues, Credit Risk Analyst for NPL alerts, Process Analyst for operational gaps, PMO for project delays, or Change Manager for adoption issues. The action is tracked against the alert until resolved."/>
+  <circle cx="1990" cy="1030" r="10" fill="#dc2626"/>
+  <text x="1990" y="1058" text-anchor="middle" font-size="8" fill="#dc2626" font-weight="600">Action → SMU</text>
+
+
+  <!-- ══════════════════════════════════════════════════════
+       SEQUENCE FLOWS (main happy path)
+  ══════════════════════════════════════════════════════ -->
+
+  <!-- Start → Enter data -->
+  <line x1="213" y1="102" x2="245" y2="102" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Enter data → Validate gateway -->
+  <line x1="375" y1="102" x2="455" y2="102" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Validate gateway → Yes → Manager approve (down then across) -->
+  <path d="M480,129 L480,160 L765,160 L765,134" fill="none" stroke="#16a34a" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <text x="620" y="155" text-anchor="middle" font-size="9" fill="#16a34a" font-weight="600">Yes</text>
+
+  <!-- Validate gateway → No → Correct -->
+  <line x1="505" y1="102" x2="540" y2="102" stroke="#dc2626" stroke-width="1.8" marker-end="url(#arr-red)"/>
+  <text x="522" y="97" text-anchor="middle" font-size="9" fill="#dc2626" font-weight="600">No</text>
+
+  <!-- Correct → back to Enter data (loop) -->
+  <path d="M600,70 L600,50 L310,50 L310,70" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-red)"/>
+
+  <!-- Manager approve → enters local DB (cross-lane message) -->
+  <path d="M765,134 L765,205 L310,205 L310,243" fill="none" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Local DB → Generate extract -->
+  <path d="M365,268 L550,268 L550,260" fill="none" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Generate extract → Apply schema -->
+  <line x1="685" y1="260" x2="720" y2="260" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Apply schema → Transmit -->
+  <line x1="850" y1="260" x2="890" y2="260" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Transmit → Ingest (cross-lane, down) -->
+  <path d="M955,292 L955,380 L955,415" fill="none" stroke="#a855f7" stroke-width="1.8" stroke-dasharray="6,3" marker-end="url(#arr-purple)"/>
+
+  <!-- Ingest → Warehouse validation gateway -->
+  <line x1="1020" y1="447" x2="1075" y2="447" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Validation gateway → Yes → Write to DW -->
+  <path d="M1100,420 L1100,395 L1465,395 L1465,415" fill="none" stroke="#16a34a" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <text x="1280" y="390" text-anchor="middle" font-size="9" fill="#16a34a" font-weight="600">Yes — Valid</text>
+
+  <!-- Validation gateway → No → Flag exception -->
+  <line x1="1125" y1="447" x2="1145" y2="447" stroke="#dc2626" stroke-width="1.8" marker-end="url(#arr-red)"/>
+  <text x="1136" y="443" text-anchor="middle" font-size="9" fill="#dc2626" font-weight="600">No</text>
+
+  <!-- Write to DW → Update DW core tables (left arrow to data store) -->
+  <line x1="1400" y1="447" x2="1400" y2="447" stroke="#7e22ce" stroke-width="1"/>
+  <line x1="1400" y1="447" x2="1340" y2="447" stroke="#7e22ce" stroke-width="1.8" marker-end="url(#arr-purple)"/>
+
+  <!-- Write to DW → Update freshness log -->
+  <line x1="1530" y1="447" x2="1560" y2="447" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Update freshness log → ETL trigger (cross-lane down) -->
+  <path d="M1625,479 L1625,565 L1625,600" fill="none" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- ETL trigger → Transform -->
+  <line x1="1690" y1="632" x2="1720" y2="632" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Transform → Load to reporting layer -->
+  <line x1="1850" y1="632" x2="1870" y2="632" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Load → BA QA check (cross-lane) -->
+  <path d="M1928,664 L1928,710 L1625,710 L1625,785" fill="none" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- BA QA → Anomaly gateway -->
+  <line x1="1690" y1="817" x2="1720" y2="817" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Anomaly gateway → Yes → Investigate -->
+  <line x1="1770" y1="817" x2="1800" y2="817" stroke="#dc2626" stroke-width="1.8" marker-end="url(#arr-red)"/>
+  <text x="1786" y="812" text-anchor="middle" font-size="9" fill="#dc2626" font-weight="600">Yes</text>
+
+  <!-- Investigate → resolve loop back to QA -->
+  <path d="M1865,785 L1865,755 L1625,755 L1625,785" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-red)"/>
+
+  <!-- Anomaly gateway → No → Approve -->
+  <path d="M1745,790 L1745,760 L1465,760 L1465,785" fill="none" stroke="#16a34a" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <text x="1600" y="755" text-anchor="middle" font-size="9" fill="#16a34a" font-weight="600">No — Clear</text>
+
+  <!-- Approve → Dashboard refresh (cross-lane down) -->
+  <path d="M1465,849 L1465,900 L1465,930" fill="none" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Dashboard refresh → CEO views -->
+  <line x1="1530" y1="962" x2="1560" y2="962" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- CEO views → Drill down -->
+  <line x1="1690" y1="962" x2="1720" y2="962" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Drill down → Action gateway -->
+  <line x1="1850" y1="962" x2="1890" y2="962" stroke="#6b7280" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- Action gateway → No action → End -->
+  <line x1="1940" y1="962" x2="1974" y2="962" stroke="#16a34a" stroke-width="1.8" marker-end="url(#arr-green)"/>
+  <text x="1957" y="957" text-anchor="middle" font-size="9" fill="#16a34a" font-weight="600">No</text>
+
+  <!-- Action gateway → Yes → End delegated -->
+  <path d="M1915,989 L1915,1030 L1974,1030" fill="none" stroke="#dc2626" stroke-width="1.8" marker-end="url(#arr-red)"/>
+  <text x="1937" y="1015" text-anchor="middle" font-size="9" fill="#dc2626" font-weight="600">Yes</text>
+
+  <!-- ══════════════════════════════════════════════════════
+       ANNOTATION BOXES (key notes)
+  ══════════════════════════════════════════════════════ -->
+
+  <!-- Note: Frequency -->
+  <rect x="160" y="310" width="200" height="56" rx="5" fill="#fff" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="170" y="327" font-size="9" fill="#374151" font-weight="700">📅 Data Submission Frequency</text>
+  <text x="170" y="341" font-size="9" fill="#6b7280">• Financial: Daily automated</text>
+  <text x="170" y="353" font-size="9" fill="#6b7280">• Operational KPIs: Weekly</text>
+  <text x="170" y="365" font-size="9" fill="#6b7280">• Compliance: Monthly</text>
+  <line x1="260" y1="295" x2="260" y2="310" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <!-- Note: 8 subsidiaries -->
+  <rect x="820" y="310" width="210" height="56" rx="5" fill="#fff" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="830" y="327" font-size="9" fill="#374151" font-weight="700">🏢 8 Subsidiary Sources</text>
+  <text x="830" y="341" font-size="9" fill="#6b7280">BB Financials · Orbita · Dynasty MFB</text>
+  <text x="830" y="353" font-size="9" fill="#6b7280">ZidaKredit · Buyletlive · Rabafast</text>
+  <text x="830" y="365" font-size="9" fill="#6b7280">Dealmakers · BB Energy</text>
+  <line x1="955" y1="292" x2="955" y2="310" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <!-- Note: schema -->
+  <rect x="1270" y="510" width="200" height="44" rx="5" fill="#fff" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="1280" y="527" font-size="9" fill="#374151" font-weight="700">🗄 Star Schema Tables</text>
+  <text x="1280" y="541" font-size="9" fill="#6b7280">fact_revenue · fact_loans · fact_deliveries</text>
+  <text x="1280" y="553" font-size="9" fill="#6b7280">dim_subsidiary · dim_time · dim_currency</text>
+  <line x1="1340" y1="455" x2="1340" y2="510" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <!-- Note: CEO 5 questions -->
+  <rect x="1540" y="1010" width="220" height="44" rx="5" fill="#fff" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="1550" y="1027" font-size="9" fill="#374151" font-weight="700">👔 5 CEO Questions Answered</text>
+  <text x="1550" y="1041" font-size="9" fill="#6b7280">Growing? Safe? Capital efficient?</text>
+  <text x="1550" y="1053" font-size="9" fill="#6b7280">Clients staying? Strategy executing?</text>
+  <line x1="1650" y1="994" x2="1650" y2="1010" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <!-- Section dividers / labels -->
+  <text x="160" y="178" font-size="10" fill="#1e40af" font-weight="700" opacity="0.6">① ENTRY</text>
+  <text x="550" y="178" font-size="10" fill="#1e40af" font-weight="700" opacity="0.6">② VALIDATE</text>
+  <text x="700" y="178" font-size="10" fill="#1e40af" font-weight="700" opacity="0.6">③ APPROVE</text>
+  <text x="550" y="370" font-size="10" fill="#15803d" font-weight="700" opacity="0.6">④ EXTRACT</text>
+  <text x="720" y="370" font-size="10" fill="#15803d" font-weight="700" opacity="0.6">⑤ FORMAT</text>
+  <text x="890" y="370" font-size="10" fill="#15803d" font-weight="700" opacity="0.6">⑥ TRANSMIT</text>
+  <text x="890" y="555" font-size="10" fill="#7e22ce" font-weight="700" opacity="0.6">⑦ INGEST</text>
+  <text x="1075" y="555" font-size="10" fill="#7e22ce" font-weight="700" opacity="0.6">⑧ WAREHOUSE QA</text>
+  <text x="1400" y="555" font-size="10" fill="#7e22ce" font-weight="700" opacity="0.6">⑨ STORE</text>
+  <text x="1560" y="555" font-size="10" fill="#7e22ce" font-weight="700" opacity="0.6">⑩ LOG</text>
+  <text x="1560" y="745" font-size="10" fill="#92400e" font-weight="700" opacity="0.6">⑪ ETL</text>
+  <text x="1720" y="745" font-size="10" fill="#92400e" font-weight="700" opacity="0.6">⑫ TRANSFORM</text>
+  <text x="1870" y="745" font-size="10" fill="#92400e" font-weight="700" opacity="0.6">⑬ LOAD</text>
+  <text x="1560" y="893" font-size="10" fill="#991b1b" font-weight="700" opacity="0.6">⑭ QA REVIEW</text>
+  <text x="1720" y="893" font-size="10" fill="#991b1b" font-weight="700" opacity="0.6">⑮ VERIFY</text>
+  <text x="1400" y="893" font-size="10" fill="#991b1b" font-weight="700" opacity="0.6">⑯ APPROVE</text>
+  <text x="1400" y="1048" font-size="10" fill="#166534" font-weight="700" opacity="0.6">⑰ PUBLISH</text>
+  <text x="1560" y="1048" font-size="10" fill="#166534" font-weight="700" opacity="0.6">⑱ DISPLAY</text>
+  <text x="1720" y="1048" font-size="10" fill="#166534" font-weight="700" opacity="0.6">⑲ DRILL-DOWN</text>
+  <text x="1870" y="1048" font-size="10" fill="#166534" font-weight="700" opacity="0.6">⑳ DECIDE</text>
+
+  </svg>
+  </div>
+</div>
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+  // Tooltip on hover
+  const tooltip = document.getElementById('tooltip');
+  document.querySelectorAll('.bpmn-el').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('mouseenter', e => {
+      const title = el.getAttribute('data-title');
+      const info  = el.getAttribute('data-info');
+      tooltip.innerHTML = `<strong>${title}</strong>${info}`;
+      tooltip.classList.add('show');
+    });
+    el.addEventListener('mousemove', e => {
+      const x = e.clientX + 16, y = e.clientY + 12;
+      tooltip.style.left = Math.min(x, window.innerWidth - 280) + 'px';
+      tooltip.style.top  = Math.min(y, window.innerHeight - 120) + 'px';
+    });
+    el.addEventListener('mouseleave', () => {
+      tooltip.classList.remove('show');
+    });
+  });
+
+  // Zoom controls
+  const svg = document.getElementById('bpmn');
+  let scale = 1;
+
+  function setScale(s) {
+    scale = Math.max(0.3, Math.min(2.5, s));
+    svg.style.transform = `scale(${scale})`;
+    svg.style.transformOrigin = 'top left';
+    svg.style.width  = (2020 * scale) + 'px';
+    svg.style.height = (1060 * scale) + 'px';
+  }
+
+  document.getElementById('zoomIn').addEventListener('click', () => setScale(scale + 0.15));
+  document.getElementById('zoomOut').addEventListener('click', () => setScale(scale - 0.15));
+  document.getElementById('resetBtn').addEventListener('click', () => setScale(1));
+
+  // Fit to container
+  function fitToContainer() {
+    const container = document.getElementById('svgContainer');
+    const cw = container.clientWidth - 30;
+    const fw = cw / 2020;
+    setScale(fw);
+  }
+  document.getElementById('zoomFit').addEventListener('click', fitToContainer);
+  window.addEventListener('load', fitToContainer);
+  window.addEventListener('resize', fitToContainer);
+</script>
+</body>
+</html>

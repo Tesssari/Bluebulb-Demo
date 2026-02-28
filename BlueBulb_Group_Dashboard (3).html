@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>BlueBulb Group — Strategic Intelligence Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:#f0f2f5;font-family:'DM Sans','Segoe UI',sans-serif}
+    ::-webkit-scrollbar{width:5px;height:5px}
+    ::-webkit-scrollbar-track{background:#e8eaed}
+    ::-webkit-scrollbar-thumb{background:#c0c8d4;border-radius:3px}
+    button{font-family:inherit;cursor:pointer}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect}=React;
+
+// ── LIGHT MODE TOKENS ────────────────────────────────────────────────────
+// Background layers
+const BG_PAGE   = "#f0f2f5";   // page background
+const BG_TOPBAR = "#ffffff";   // topbar
+const BG_CARD   = "#ffffff";   // card surface
+const BG_INSET  = "#f7f8fa";   // inset / nested cells
+const BG_DEEP   = "#eef0f4";   // deeper inset / alt row
+
+// Borders
+const BD_CARD   = "#e2e6ec";
+const BD_INNER  = "#eaecf0";
+
+// Text
+const TX_TITLE  = "#111827";   // page/card titles
+const TX_BODY   = "#374151";   // body text
+const TX_SUB    = "#6b7280";   // subtext / labels
+const TX_FAINT  = "#9ca3af";   // very light labels
+
+// Accent (BlueBulb gold)
+const ACCENT    = "#b8922a";   // darker gold — readable on white
+
+// Status
+const ST_CLR = {green:"#16a34a", amber:"#d97706", red:"#dc2626"};
+const ST_BG  = {green:"#f0fdf4", amber:"#fffbeb", red:"#fef2f2"};
+const ST_BD  = {green:"#bbf7d0", amber:"#fde68a", red:"#fecaca"};
+const ST_LBL = {green:"PASS",   amber:"WATCH",   red:"BREACH"};
+
+// Category colours — slightly darkened for white backgrounds
+const CAT_CLR = {
+  Regulatory:"#991b1b",
+  Credit:     "#92400e",
+  Operational:"#065f46",
+  Financial:  "#3730a3",
+  Commercial: "#166534",
+};
+
+// ── DATA ─────────────────────────────────────────────────────────────────
+const SUBS=[
+  {id:"financials",name:"Bluebulb Financials",type:"Payments",      color:"#b8922a",rev:48.2,trend:14.1,st:"green", k1l:"Transaction Vol",k1:"$792M",  k2l:"Settlement Rate",k2:"99.1%",k3l:"FX Margin",    k3:"1.84%"},
+  {id:"orbita",    name:"Orbita Platform",    type:"SaaS Treasury", color:"#0a7c7c",rev:9.4, trend:41.2,st:"amber", k1l:"Active CFOs",    k1:"187",    k2l:"Adoption Rate",  k2:"23.4%",k3l:"Time Saved",   k3:"14 hrs/wk"},
+  {id:"dynasty",   name:"Dynasty MFB",        type:"Microfinance",  color:"#991b1b",rev:12.1,trend:6.3, st:"amber", k1l:"Loan Portfolio", k1:"₦4.2B",  k2l:"NPL Ratio",      k2:"2.8%", k3l:"CAR",          k3:"14.2%"},
+  {id:"zida",      name:"ZidaKredit",         type:"Lending",       color:"#166534",rev:7.8, trend:9.1, st:"green", k1l:"Disbursements",  k1:"₦1.8B",  k2l:"Repayment Rate", k2:"91.4%",k3l:"Cost of Risk",  k3:"3.1%"},
+  {id:"buyletlive",name:"Buyletlive",         type:"PropTech",      color:"#5b21b6",rev:5.2, trend:22.7,st:"green", k1l:"GMV",            k1:"₦2.1B",  k2l:"Conversion",     k2:"3.8%", k3l:"Listings",     k3:"4,200"},
+  {id:"rabafast",  name:"Rabafast",           type:"Logistics",     color:"#1e40af",rev:3.9, trend:18.4,st:"green", k1l:"Deliveries/Mo",  k1:"12,400", k2l:"On-Time Rate",   k2:"87.2%",k3l:"Cost/Delivery", k3:"₦1,240"},
+  {id:"dealmakers",name:"Dealmakers",         type:"Investment",    color:"#92400e",rev:2.1, trend:5.8, st:"amber", k1l:"Pipeline",       k1:"₦8.4B",  k2l:"Conv. Rate",     k2:"18%",  k3l:"Avg ROI",      k3:"22%"},
+  {id:"energy",    name:"Bluebulb Energy",    type:"Clean Energy",  color:"#166534",rev:1.8, trend:67.3,st:"green", k1l:"Installations",  k1:"340",    k2l:"Pipeline",       k2:"₦420M",k3l:"Avg Margin",   k3:"31%"},
+];
+
+const COMPLIANCE_GRP=[
+  {label:"NDPA Licence",        status:"green",detail:"Current — Renewed Feb 2026",        days:null},
+  {label:"FCA Reporting (UK)",  status:"green",detail:"Q1 Filing — 28 days remaining",     days:28},
+  {label:"CBN Capital Adequacy",status:"green",detail:"14.2% — Above 10% minimum",         days:null},
+  {label:"2026 Tax Reform Act", status:"amber",detail:"Cross-border report due in 7 days", days:7},
+  {label:"KYB Renewals",        status:"amber",detail:"142 clients pending renewal",        days:null},
+  {label:"AML Alerts",          status:"green",detail:"No unreviewed flags",                days:null},
+];
+
+const VOL=[52,58,61,55,63,68,71,66,74,79,81,76,84,88,92];
+const NPL=[3.8,3.6,3.5,3.4,3.2,3.1,3.0,3.1,2.9,2.8,2.8,2.7,2.8,2.7,2.8];
+const FXD=[1.62,1.71,1.68,1.74,1.79,1.81,1.77,1.83,1.85,1.82,1.87,1.84,1.89,1.86,1.84];
+
+const SUB_RISK={
+  financials:{overall:"amber",regs:["FCA (UK)","CBN","NDPA"],items:[
+    {cat:"Regulatory", label:"FCA Registration (UK)",      st:"green",detail:"Active — next review Q3 2026",              action:null},
+    {cat:"Regulatory", label:"NDPA Data Compliance",        st:"green",detail:"Licence current — renewed Feb 2026",         action:null},
+    {cat:"Regulatory", label:"2026 Tax Reform Act",         st:"amber",detail:"Cross-border report due in 7 days",          action:"File by 7 Mar"},
+    {cat:"Operational",label:"KYB Client Renewals",         st:"amber",detail:"142 of 2,041 clients require KYB renewal",   action:"Prioritise top 50 by value"},
+    {cat:"Operational",label:"AML Transaction Monitoring",  st:"green",detail:"No unreviewed flags — 0 open alerts",        action:null},
+    {cat:"Financial",  label:"FX Rate Deviation",           st:"green",detail:"All corridors within 1.5% of market rate",   action:null},
+    {cat:"Financial",  label:"Settlement Failure Rate",      st:"green",detail:"0.4% — well below 2% threshold",            action:null},
+    {cat:"Operational",label:"NG → CN Corridor Uptime",     st:"amber",detail:"97.8% — slightly below 99% SLA target",     action:"Escalate to tech team"},
+  ]},
+  orbita:{overall:"amber",regs:["NDPA","FCA (indirect)"],items:[
+    {cat:"Commercial", label:"Client Adoption Rate",        st:"amber",detail:"23.4% vs 30% Q1 target — 6.6pp gap",        action:"Escalate to Change Manager"},
+    {cat:"Commercial", label:"Churn Risk — 12 Clients",     st:"amber",detail:"12 clients showing disengagement signals",   action:"CSM outreach this week"},
+    {cat:"Regulatory", label:"NDPA Data Processing",        st:"green",detail:"User data handling compliant — audited Jan", action:null},
+    {cat:"Operational",label:"Platform Uptime",             st:"green",detail:"99.7% — above 99.5% SLA",                   action:null},
+    {cat:"Financial",  label:"Time-to-Value (Onboarding)",  st:"amber",detail:"Avg 18 days vs 10-day target",               action:"Review onboarding workflow"},
+    {cat:"Operational",label:"Data Security Controls",      st:"green",detail:"Penetration test passed — Dec 2025",         action:null},
+    {cat:"Commercial", label:"Treasury Module Adoption",    st:"amber",detail:"Only 41% of users access treasury module",   action:"Product UX review — Q1"},
+    {cat:"Financial",  label:"Revenue Concentration",       st:"green",detail:"No single client above 8% of MRR",           action:null},
+  ]},
+  dynasty:{overall:"amber",regs:["CBN","NDPA","NFIU (AML)"],items:[
+    {cat:"Regulatory",label:"CBN Capital Adequacy Ratio",  st:"green",detail:"14.2% — above CBN 10% minimum",             action:null},
+    {cat:"Regulatory",label:"CBN Liquidity Coverage",      st:"green",detail:"142% — above 100% regulatory minimum",      action:null},
+    {cat:"Credit",    label:"NPL Ratio",                   st:"green",detail:"2.8% — in safe zone below 3%",              action:null},
+    {cat:"Credit",    label:"Early Delinquency (30-day)",  st:"amber",detail:"4.1% — approaching 5% watch threshold",     action:"Review FMCG sector exposure"},
+    {cat:"Credit",    label:"FMCG Sector Concentration",   st:"amber",detail:"28% of book in one sector — above 25%",     action:"Tighten new FMCG approvals"},
+    {cat:"Regulatory",label:"NFIU AML Reporting",          st:"green",detail:"All STRs filed — no outstanding alerts",    action:null},
+    {cat:"Operational",label:"Core Banking Uptime",        st:"green",detail:"99.9% — no outages in 60 days",             action:null},
+    {cat:"Regulatory",label:"CBN Annual Returns",          st:"green",detail:"2025 returns filed — next due Dec 2026",    action:null},
+  ]},
+  zida:{overall:"green",regs:["CBN","NDPA"],items:[
+    {cat:"Credit",    label:"Repayment Rate",              st:"green",detail:"91.4% — above 90% internal threshold",      action:null},
+    {cat:"Credit",    label:"Cost of Risk",                st:"green",detail:"3.1% — within acceptable range",            action:null},
+    {cat:"Credit",    label:"30-Day Early Delinquency",    st:"green",detail:"2.8% — below 5% watch threshold",          action:null},
+    {cat:"Regulatory",label:"CBN Compliance Returns",      st:"green",detail:"All returns current — last filed Jan 2026", action:null},
+    {cat:"Operational",label:"Loan Disbursement Accuracy", st:"green",detail:"99.2% disbursements processed correctly",   action:null},
+    {cat:"Financial", label:"Portfolio Concentration",     st:"green",detail:"No single borrower above 8% of book",       action:null},
+    {cat:"Regulatory",label:"NDPA Borrower Data",          st:"green",detail:"Data processing agreement updated Q4 2025", action:null},
+    {cat:"Operational",label:"Collections Automation",     st:"amber",detail:"Manual collections for 12% of overdue",     action:"Automate reminder workflows"},
+  ]},
+  buyletlive:{overall:"green",regs:["NDPA","CAC"],items:[
+    {cat:"Operational",label:"Platform Fraud Rate",        st:"green",detail:"0.3% flagged — below 0.5% threshold",       action:null},
+    {cat:"Regulatory", label:"CAC Business Registration",  st:"green",detail:"Registered and current — Lagos State",       action:null},
+    {cat:"Regulatory", label:"NDPA User Data Compliance",  st:"green",detail:"Privacy policy updated Jan 2026",            action:null},
+    {cat:"Operational",label:"Seller Verification (KYB)",  st:"amber",detail:"78% of active sellers fully KYB-verified",   action:"Complete 22% outstanding"},
+    {cat:"Financial",  label:"Escrow Reconciliation",      st:"green",detail:"Daily reconciliation — 0 discrepancies",     action:null},
+    {cat:"Operational",label:"Dispute Resolution SLA",     st:"amber",detail:"Avg 4.2 days vs 3-day target",              action:"Review dispute workflow"},
+    {cat:"Operational",label:"Property Listing Accuracy",  st:"green",detail:"97% of listings verified within 48 hrs",    action:null},
+    {cat:"Financial",  label:"Fee Collection Rate",        st:"green",detail:"99.1% fees collected within terms",          action:null},
+  ]},
+  rabafast:{overall:"amber",regs:["NDPA","CAC","LASG Transport"],items:[
+    {cat:"Operational",label:"On-Time Delivery Rate",      st:"amber",detail:"87.2% vs 90% SLA — 2.8pp gap",              action:"Review Lagos Island routes"},
+    {cat:"Operational",label:"Failed Delivery Rate",       st:"amber",detail:"4.8% — above 3% internal threshold",        action:"Vendor quality review"},
+    {cat:"Regulatory", label:"LASG Vehicle Roadworthiness",st:"green",detail:"Fleet compliance verified Q1 2026",          action:null},
+    {cat:"Regulatory", label:"NDPA Delivery Data",         st:"green",detail:"Customer data handling compliant",            action:null},
+    {cat:"Operational",label:"Tier-1 Vendor Performance",  st:"green",detail:"Top 10 vendors scoring above 85%",           action:null},
+    {cat:"Operational",label:"Tier-2 Vendor Performance",  st:"amber",detail:"3 Tier-2 vendors below 70% score",          action:"Issue performance notices"},
+    {cat:"Financial",  label:"Client Invoice Collections", st:"green",detail:"94% of invoices paid within terms",          action:null},
+    {cat:"Operational",label:"Platform Downtime",          st:"green",detail:"No unplanned downtime in 45 days",           action:null},
+  ]},
+  dealmakers:{overall:"amber",regs:["SEC Nigeria","CAC","NDPA"],items:[
+    {cat:"Regulatory", label:"SEC Nigeria Registration",   st:"amber",detail:"Renewal application submitted — pending",    action:"Follow up with SEC this week"},
+    {cat:"Regulatory", label:"CAC Annual Returns",         st:"green",detail:"2025 returns filed on time",                 action:null},
+    {cat:"Operational",label:"Deal Documentation",         st:"amber",detail:"3 active deals missing signed term sheets",  action:"Obtain signatures this week"},
+    {cat:"Financial",  label:"Client Fund Segregation",    st:"green",detail:"All client funds in dedicated accounts",     action:null},
+    {cat:"Financial",  label:"Deal Concentration Risk",    st:"amber",detail:"Top 2 deals = 61% of active pipeline",      action:"Diversify pipeline Q2"},
+    {cat:"Regulatory", label:"NDPA Client Data",           st:"green",detail:"Data processing agreements in place",        action:null},
+    {cat:"Operational",label:"Partner Due Diligence",      st:"green",detail:"All active partners KYC-cleared",            action:null},
+    {cat:"Financial",  label:"Revenue Recognition Policy", st:"amber",detail:"Policy documentation incomplete",            action:"Finance to complete by Apr"},
+  ]},
+  energy:{overall:"amber",regs:["NERC","NDPA","SON","CAC"],items:[
+    {cat:"Regulatory", label:"NERC Licence (Generation)",  st:"amber",detail:"Application in progress — not yet issued",   action:"Expedite NERC filing now"},
+    {cat:"Regulatory", label:"SON Product Certification",  st:"green",detail:"Solar panels certified — batch valid 2026",  action:null},
+    {cat:"Operational",label:"Installation Safety",        st:"green",detail:"All technicians certified — audited Dec",    action:null},
+    {cat:"Financial",  label:"Client Receivables Overdue", st:"amber",detail:"₦38M outstanding beyond 60 days",           action:"Collections team escalation"},
+    {cat:"Operational",label:"Job Management System",      st:"amber",detail:"No structured digital job tracking yet",     action:"Build jobs database — priority"},
+    {cat:"Regulatory", label:"NDPA Privacy Policy",        st:"amber",detail:"Privacy policy not yet formally documented", action:"Legal to draft by Mar 31"},
+    {cat:"Operational",label:"Field Engineer Certification",st:"green",detail:"100% of field staff certified",             action:null},
+    {cat:"Financial",  label:"Project Cost Overrun Rate",  st:"amber",detail:"18% of jobs exceeding initial quote",        action:"Review quoting methodology"},
+  ]},
+};
+
+// ── PRIMITIVES ────────────────────────────────────────────────────────────
+function Dot({status,size=9}){
+  const c=ST_CLR[status]||"#888";
+  return <span style={{display:"inline-block",width:size,height:size,borderRadius:"50%",
+    background:c,marginRight:5,flexShrink:0,boxShadow:`0 0 4px ${c}66`}}/>;
+}
+
+function Spark({data,color,h=32,w=110}){
+  const mn=Math.min(...data),mx=Math.max(...data),rng=mx-mn||1;
+  const pts=data.map((v,i)=>{
+    const x=(i/(data.length-1))*w, y=h-((v-mn)/rng)*(h-4)-2;
+    return `${x},${y}`;
+  }).join(" ");
+  const id=`sp${(color||"x").replace(/[^a-z0-9]/gi,"")}${Math.random().toString(36).slice(2,5)}`;
+  return(
+    <svg width={w} height={h} style={{overflow:"visible",display:"block"}}>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      <polygon points={`0,${h} ${pts} ${w},${h}`} fill={`url(#${id})`}/>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function Donut({value,max,color,size=54,stroke=7}){
+  const r=(size-stroke)/2,c=2*Math.PI*r,d=(value/max)*c;
+  return(
+    <svg width={size} height={size} style={{flexShrink:0}}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#e5e7eb" strokeWidth={stroke}/>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+        strokeDasharray={`${d} ${c-d}`} strokeLinecap="round"
+        transform={`rotate(-90 ${size/2} ${size/2})`}/>
+    </svg>
+  );
+}
+
+function Bars({data,color,h=50,w=155}){
+  const mx=Math.max(...data),bw=w/data.length-2;
+  return(
+    <svg width={w} height={h}>
+      {data.map((v,i)=>{
+        const bh=(v/mx)*(h-5),x=i*(bw+2),y=h-bh;
+        return <rect key={i} x={x} y={y} width={bw} height={bh}
+          fill={i===data.length-1?color:`${color}55`} rx={2}/>;
+      })}
+    </svg>
+  );
+}
+
+function LineChart({datasets,h=110,w=320}){
+  const all=datasets.flatMap(d=>d.data);
+  const mn=Math.min(...all),mx=Math.max(...all),rng=mx-mn||1;
+  const xs=w/(datasets[0].data.length-1);
+  return(
+    <svg width={w} height={h} style={{overflow:"visible"}}>
+      <defs>
+        {datasets.map(ds=>(
+          <linearGradient key={ds.lbl} id={`lg${ds.lbl}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={ds.color} stopOpacity="0.18"/>
+            <stop offset="100%" stopColor={ds.color} stopOpacity="0"/>
+          </linearGradient>
+        ))}
+      </defs>
+      {[0,0.25,0.5,0.75,1].map(t=>(
+        <line key={t} x1={0} y1={t*h} x2={w} y2={t*h} stroke={BD_INNER} strokeWidth={1}/>
+      ))}
+      {datasets.map(ds=>{
+        const pts=ds.data.map((v,i)=>({x:i*xs,y:h-((v-mn)/rng)*(h-8)-4}));
+        const lp=pts.map(p=>`${p.x},${p.y}`).join(" ");
+        const ap=`0,${h} ${lp} ${(ds.data.length-1)*xs},${h}`;
+        return(
+          <g key={ds.lbl}>
+            <polygon points={ap} fill={`url(#lg${ds.lbl})`}/>
+            <polyline points={lp} fill="none" stroke={ds.color} strokeWidth={2}
+              strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx={pts[pts.length-1].x} cy={pts[pts.length-1].y} r={4}
+              fill={ds.color} stroke="#fff" strokeWidth={2}/>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ── LAYOUT PRIMITIVES ────────────────────────────────────────────────────
+function Card({children,style={}}){
+  return <div style={{background:BG_CARD,border:`1px solid ${BD_CARD}`,
+    borderRadius:10,padding:18,boxShadow:"0 1px 3px rgba(0,0,0,0.06)",...style}}>{children}</div>;
+}
+
+function CardTitle({children,sub}){
+  return(
+    <div style={{marginBottom:14}}>
+      <div style={{fontWeight:700,color:TX_TITLE,fontSize:14}}>{children}</div>
+      {sub&&<div style={{fontSize:11,color:TX_SUB,marginTop:2}}>{sub}</div>}
+    </div>
+  );
+}
+
+function TabBtn({active,onClick,children}){
+  return(
+    <button onClick={onClick} style={{
+      background:active?"#1d3557":"transparent",
+      border:active?"1px solid #1d3557":"1px solid transparent",
+      color:active?"#ffffff":TX_SUB,
+      padding:"5px 13px",borderRadius:6,fontSize:12,
+      fontWeight:active?600:400,transition:"all 0.15s"
+    }}>{children}</button>
+  );
+}
+
+function FilterBtn({active,color,onClick,children}){
+  const bg = active ? (color||"#1d3557") : "transparent";
+  return(
+    <button onClick={onClick} style={{
+      background:bg,
+      border:`1px solid ${active?(color||"#1d3557"):BD_CARD}`,
+      color:active?"#fff":TX_SUB,
+      padding:"4px 11px",borderRadius:5,fontSize:11,
+      fontWeight:active?600:400,transition:"all 0.15s"
+    }}>{children}</button>
+  );
+}
+
+// ── TABS ─────────────────────────────────────────────────────────────────
+const TABS=[
+  {id:"overview",   label:"Group Overview"},
+  {id:"financials", label:"Financial Intelligence"},
+  {id:"risk",       label:"Risk & Compliance"},
+  {id:"subs",       label:"Subsidiaries"},
+  {id:"subrisk",    label:"Subsidiary Risk Monitor"},
+];
+
+// ── APP ──────────────────────────────────────────────────────────────────
+function App(){
+  const [tab,setTab]=useState("overview");
+  const [sub,setSub]=useState(null);
+  const [time,setTime]=useState(new Date());
+  const [on,setOn]=useState(false);
+
+  useEffect(()=>{setTimeout(()=>setOn(true),80);},[]);
+  useEffect(()=>{const t=setInterval(()=>setTime(new Date()),1000);return()=>clearInterval(t);},[]);
+
+  const ts=time.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  const ds=time.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+
+  return(
+    <div style={{fontFamily:"'DM Sans','Segoe UI',sans-serif",background:BG_PAGE,
+      minHeight:"100vh",color:TX_BODY,fontSize:13}}>
+
+      {/* TOPBAR */}
+      <div style={{background:BG_TOPBAR,borderBottom:`1px solid ${BD_CARD}`,
+        padding:"0 22px",display:"flex",alignItems:"center",
+        justifyContent:"space-between",height:52,
+        position:"sticky",top:0,zIndex:100,
+        boxShadow:"0 1px 4px rgba(0,0,0,0.08)"}}>
+
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{width:28,height:28,borderRadius:6,
+              background:"linear-gradient(135deg,#b8922a,#d4a93c)",
+              display:"flex",alignItems:"center",justifyContent:"center",
+              fontWeight:800,fontSize:14,color:"#fff"}}>B</div>
+            <div>
+              <div style={{fontWeight:700,fontSize:14,color:TX_TITLE,lineHeight:1.1}}>BlueBulb Group</div>
+              <div style={{fontSize:10,color:TX_SUB}}>Strategic Intelligence</div>
+            </div>
+          </div>
+          <div style={{width:1,height:24,background:BD_CARD}}/>
+          <div style={{display:"flex",gap:4}}>
+            {TABS.map(t=>(
+              <TabBtn key={t.id} active={tab===t.id} onClick={()=>setTab(t.id)}>{t.label}</TabBtn>
+            ))}
+          </div>
+        </div>
+
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:5}}>
+            <Dot status="green" size={7}/>
+            <span style={{color:ST_CLR.green,fontSize:11,fontWeight:500}}>All Systems Operational</span>
+          </div>
+          <span style={{color:TX_SUB,fontSize:11}}>{ts} · {ds}</span>
+          <span style={{background:"#f0f4ff",border:"1px solid #c7d2fe",
+            borderRadius:20,padding:"2px 11px",fontSize:10,color:"#3730a3",fontWeight:500}}>
+            SMU v1.0
+          </span>
+        </div>
+      </div>
+
+      {/* CONTENT */}
+      <div style={{padding:"20px 22px",maxWidth:1400,margin:"0 auto",
+        opacity:on?1:0,transform:on?"none":"translateY(6px)",transition:"all 0.3s ease"}}>
+        {tab==="overview"  &&<Overview on={on} setSub={setSub} setTab={setTab} time={time}/>}
+        {tab==="financials"&&<Financials/>}
+        {tab==="risk"      &&<RiskGrp/>}
+        {tab==="subs"      &&<SubsTab sub={sub} setSub={setSub}/>}
+        {tab==="subrisk"   &&<SubRisk initSub={sub?sub.id:SUBS[0].id}/>}
+      </div>
+
+      {/* FOOTER */}
+      <div style={{borderTop:`1px solid ${BD_CARD}`,padding:"10px 22px",
+        display:"flex",justifyContent:"space-between",alignItems:"center",
+        background:BG_TOPBAR,marginTop:16}}>
+        <span style={{fontSize:10,color:TX_SUB}}>
+          BlueBulb Group SMU · Strategic Intelligence Dashboard · Business Analytics &amp; Data Analyst Role
+        </span>
+        <div style={{display:"flex",gap:8}}>
+          {["Power BI","SQL Pipeline","8 Subsidiaries","Real-Time"].map(t=>(
+            <span key={t} style={{fontSize:9,color:TX_SUB,background:BG_INSET,
+              border:`1px solid ${BD_CARD}`,borderRadius:4,padding:"2px 7px"}}>{t}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── OVERVIEW ─────────────────────────────────────────────────────────────
+function Overview({on,setSub,setTab,time}){
+  const ts=time.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+  const tiles=[
+    {q:"Is the Group growing?",  val:"$792.4M",sub:"Transaction Volume", trend:"+12.3% MoM",          st:"green",color:"#b8922a",data:VOL},
+    {q:"Is the Group safe?",     val:"94/100",  sub:"Compliance Score",   trend:"NDPA · FCA · CBN",     st:"green",color:"#16a34a",data:[88,89,90,91,92,91,93,92,94,94,93,95,94,94,94]},
+    {q:"Is capital efficient?",  val:"14.2%",   sub:"Capital Adequacy",   trend:"+0.4% vs last month",  st:"green",color:"#0a7c7c",data:[12.1,12.4,12.8,13.1,13.0,13.4,13.6,13.8,13.9,14.0,14.1,14.0,14.2,14.2,14.2]},
+    {q:"Are clients staying?",   val:"91.4%",   sub:"90-Day Retention",   trend:"2,041 active clients", st:"amber",color:"#d97706",data:[88,89,90,90,91,91,90,91,92,91,91,92,91,91,91]},
+    {q:"Is strategy executing?", val:"78%",     sub:"KPI Achievement",    trend:"14 of 18 on track",    st:"amber",color:"#7c3aed",data:[60,62,65,67,68,70,71,72,74,75,76,77,77,78,78]},
+  ];
+  const alerts=[
+    {st:"amber",title:"Tax Reform Filing Due",        detail:"Cross-border report — 7 days", badge:"7d"},
+    {st:"amber",title:"KYB Renewals Pending",         detail:"142 clients — action required", badge:"Now"},
+    {st:"amber",title:"Orbita Adoption Below Target", detail:"23.4% vs 30% Q1 target",       badge:"Q1"},
+    {st:"green",title:"NPL Within Safe Range",        detail:"2.8% — below 3% threshold",    badge:"✓"},
+    {st:"green",title:"NDPA Licence Current",         detail:"Renewed Feb 2026",              badge:"✓"},
+    {st:"green",title:"FCA Q1 Filing On Track",       detail:"28 days remaining",             badge:"28d"},
+  ];
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+        <div>
+          <div style={{fontSize:20,fontWeight:800,color:TX_TITLE}}>Group CEO View</div>
+          <div style={{fontSize:12,color:TX_SUB,marginTop:2}}>Five questions · One screen · All 8 subsidiaries</div>
+        </div>
+        <div style={{fontSize:11,color:TX_SUB,background:BG_INSET,
+          border:`1px solid ${BD_CARD}`,borderRadius:6,padding:"4px 11px"}}>Last: {ts}</div>
+      </div>
+
+      {/* CEO tiles */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12,marginBottom:16}}>
+        {tiles.map((t,i)=>(
+          <div key={i} style={{background:BG_CARD,
+            border:`1px solid ${t.st==="green"?ST_BD.green:ST_BD.amber}`,
+            borderTop:`3px solid ${t.color}`,
+            borderRadius:9,padding:16,
+            boxShadow:"0 1px 4px rgba(0,0,0,0.06)",
+            opacity:on?1:0,transform:on?"none":"translateY(10px)",
+            transition:`all 0.45s ease ${i*70}ms`}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+              <div style={{fontSize:11,color:TX_SUB,lineHeight:1.4,maxWidth:95}}>{t.q}</div>
+              <Dot status={t.st} size={7}/>
+            </div>
+            <div style={{fontSize:24,fontWeight:800,color:t.color,letterSpacing:"-0.5px",marginBottom:2}}>{t.val}</div>
+            <div style={{fontSize:11,color:TX_SUB,marginBottom:8}}>{t.sub}</div>
+            <Spark data={t.data} color={t.color} h={30} w={110}/>
+            <div style={{fontSize:10,color:ST_CLR[t.st],marginTop:5,fontWeight:600}}>{t.trend}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Middle row */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 310px",gap:12,marginBottom:12}}>
+        <Card>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <div>
+              <div style={{fontWeight:700,color:TX_TITLE,fontSize:14}}>Revenue by Subsidiary</div>
+              <div style={{fontSize:11,color:TX_SUB}}>Monthly — ₦M</div>
+            </div>
+            <span style={{fontSize:11,color:ACCENT,background:"#fdf8ee",
+              border:"1px solid #f0d898",borderRadius:20,padding:"3px 10px",fontWeight:600}}>
+              Total: ₦90.5M
+            </span>
+          </div>
+          {SUBS.map((s,i)=>{
+            const pct=Math.min((s.rev/48.2)*100,100);
+            return(
+              <div key={s.id} style={{display:"flex",alignItems:"center",gap:9,marginBottom:7}}>
+                <div style={{width:105,fontSize:11,color:TX_BODY,textAlign:"right",
+                  whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",fontWeight:500}}>
+                  {s.name.replace("Bluebulb ","BB ")}
+                </div>
+                <div style={{flex:1,height:8,background:"#f0f2f5",borderRadius:4,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${pct}%`,borderRadius:4,
+                    background:s.color,transition:`width 1s ease ${i*80}ms`}}/>
+                </div>
+                <div style={{width:44,fontSize:12,fontWeight:700,color:s.color}}>₦{s.rev}M</div>
+                <div style={{width:42,fontSize:11,fontWeight:600,
+                  color:s.trend>0?ST_CLR.green:ST_CLR.red}}>
+                  {s.trend>0?"▲":"▼"}{Math.abs(s.trend)}%
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+
+        <Card>
+          <CardTitle sub="Requires CEO attention">Active Alerts</CardTitle>
+          {alerts.map((a,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"flex-start",gap:8,
+              padding:"7px 0",borderBottom:i<5?`1px solid ${BD_INNER}`:"none"}}>
+              <div style={{marginTop:3}}><Dot status={a.st} size={8}/></div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:600,color:TX_BODY}}>{a.title}</div>
+                <div style={{fontSize:11,color:TX_SUB,marginTop:1}}>{a.detail}</div>
+              </div>
+              <span style={{fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:4,
+                background:ST_BG[a.st],color:ST_CLR[a.st],border:`1px solid ${ST_BD[a.st]}`}}>
+                {a.badge}
+              </span>
+            </div>
+          ))}
+        </Card>
+      </div>
+
+      {/* Subsidiary grid */}
+      <Card>
+        <CardTitle sub="All 8 entities · Click any card to drill down">Subsidiary Health Snapshot</CardTitle>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+          {SUBS.map((s)=>(
+            <div key={s.id} onClick={()=>{setSub(s);setTab("subs");}}
+              style={{background:BG_INSET,border:`1px solid ${BD_CARD}`,
+                borderLeft:`3px solid ${s.color}`,
+                borderRadius:7,padding:12,cursor:"pointer",transition:"all 0.15s",
+                boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}
+              onMouseOver={e=>{e.currentTarget.style.boxShadow=`0 2px 8px ${s.color}44`;e.currentTarget.style.borderColor=s.color;}}
+              onMouseOut={e=>{e.currentTarget.style.boxShadow="0 1px 2px rgba(0,0,0,0.04)";e.currentTarget.style.borderColor=BD_CARD;}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                <span style={{fontSize:11,fontWeight:700,color:s.color}}>
+                  {s.name.replace("Bluebulb ","BB ")}
+                </span>
+                <Dot status={s.st} size={7}/>
+              </div>
+              <div style={{fontSize:10,color:TX_SUB,marginBottom:8}}>{s.type}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
+                {[{l:s.k1l,v:s.k1},{l:s.k2l,v:s.k2}].map((k,j)=>(
+                  <div key={j} style={{background:BG_CARD,borderRadius:4,padding:"4px 6px",
+                    border:`1px solid ${BD_CARD}`}}>
+                    <div style={{fontSize:9,color:TX_FAINT,marginBottom:1}}>{k.l}</div>
+                    <div style={{fontSize:12,fontWeight:700,color:TX_TITLE}}>{k.v}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ── FINANCIALS ────────────────────────────────────────────────────────────
+function Financials(){
+  const metrics=[
+    {label:"Transaction Volume",val:"$792.4M",sub:"2025 Annual",         color:"#b8922a",data:VOL, pct:79,trend:"+12.3%"},
+    {label:"FX Margin (Avg)",   val:"1.84%",  sub:"All corridors",       color:"#0a7c7c",data:FXD, pct:92,trend:"+0.02%"},
+    {label:"NPL Ratio",         val:"2.8%",   sub:"Dynasty + ZidaKredit",color:"#991b1b",data:NPL, pct:28,trend:"▼0.4% ✓"},
+    {label:"Orbita MRR",        val:"₦9.4M",  sub:"187 active CFOs",     color:"#7c3aed",data:[3,4,4,5,5,6,6,7,7,8,8,9,9,9,9],pct:31,trend:"+41.2%"},
+  ];
+  const ccys=[
+    {c:"NGN",flag:"🇳🇬",val:"₦18.4B",eq:"$11.5M equiv",chg:"+2.1%",color:"#16a34a"},
+    {c:"USD",flag:"🇺🇸",val:"$8.2M", eq:"₦13.1B equiv",chg:"+0.4%",color:"#1d4ed8"},
+    {c:"GBP",flag:"🇬🇧",val:"£2.1M", eq:"$2.7M equiv", chg:"-0.8%",color:"#b8922a"},
+    {c:"EUR",flag:"🇪🇺",val:"€3.4M", eq:"$3.7M equiv", chg:"+1.2%",color:"#7c3aed"},
+    {c:"CNY",flag:"🇨🇳",val:"¥12.8M",eq:"$1.8M equiv", chg:"+0.3%",color:"#dc2626"},
+  ];
+  const cors=[
+    {name:"UK → NG",     st:"T+0",vol:"$284M",mg:"1.92%",status:"green",up:99.8},
+    {name:"USA → NG",    st:"T+0",vol:"$218M",mg:"1.87%",status:"green",up:99.6},
+    {name:"EU → NG",     st:"T+0",vol:"$176M",mg:"1.81%",status:"green",up:99.4},
+    {name:"NG → CN",     st:"T+1",vol:"$89M", mg:"1.74%",status:"amber",up:97.8},
+    {name:"Intra-Africa",st:"T+1",vol:"$26M", mg:"2.14%",status:"green",up:98.9},
+  ];
+  return(
+    <div>
+      <div style={{fontSize:20,fontWeight:800,color:TX_TITLE,marginBottom:3}}>Financial & Treasury Intelligence</div>
+      <div style={{fontSize:12,color:TX_SUB,marginBottom:18}}>Bluebulb Financials · Dynasty MFB · ZidaKredit · Orbita</div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:14}}>
+        {metrics.map((m,i)=>(
+          <div key={i} style={{background:BG_CARD,border:`1px solid ${BD_CARD}`,
+            borderTop:`3px solid ${m.color}`,borderRadius:9,padding:16,
+            boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+            <div style={{fontSize:11,color:TX_SUB,marginBottom:6}}>{m.label}</div>
+            <div style={{fontSize:24,fontWeight:800,color:m.color,marginBottom:2}}>{m.val}</div>
+            <div style={{fontSize:11,color:TX_SUB,marginBottom:8}}>{m.sub}</div>
+            <Spark data={m.data} color={m.color} h={30} w={130}/>
+            <div style={{marginTop:8,display:"flex",alignItems:"center",gap:8}}>
+              <div style={{flex:1,height:4,background:"#f0f2f5",borderRadius:2}}>
+                <div style={{height:"100%",width:`${m.pct}%`,background:m.color,borderRadius:2}}/>
+              </div>
+              <span style={{fontSize:10,color:ST_CLR.green,fontWeight:700}}>{m.trend}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+        <Card>
+          <CardTitle>Multi-Currency Cash Positions</CardTitle>
+          {ccys.map((c,i)=>(
+            <div key={c.c} style={{display:"flex",alignItems:"center",gap:10,
+              padding:"8px 0",borderBottom:i<4?`1px solid ${BD_INNER}`:"none"}}>
+              <span style={{fontSize:18}}>{c.flag}</span>
+              <span style={{width:34,fontSize:12,fontWeight:700,color:c.color}}>{c.c}</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:700,color:TX_TITLE}}>{c.val}</div>
+                <div style={{fontSize:10,color:TX_SUB}}>{c.eq}</div>
+              </div>
+              <span style={{fontSize:11,fontWeight:600,
+                color:c.chg.startsWith("+")?ST_CLR.green:ST_CLR.red}}>{c.chg}</span>
+              <Spark data={[40,42,41,43,44,43,45,44,46,45,47,46,48,47,48].map(v=>v+i*2)}
+                color={c.color} h={22} w={55}/>
+            </div>
+          ))}
+        </Card>
+        <Card>
+          <CardTitle sub="15-month view">Transaction Volume & NPL Trend</CardTitle>
+          <LineChart datasets={[
+            {lbl:"vol",data:VOL,color:"#b8922a"},
+            {lbl:"npl",data:NPL.map(v=>v*25),color:"#991b1b"},
+          ]} h={108} w={340}/>
+          <div style={{display:"flex",gap:16,marginTop:10}}>
+            {[["#b8922a","Transaction Volume ($M)"],["#991b1b","NPL Index (scaled)"]].map(([c,l])=>(
+              <div key={l} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:TX_SUB}}>
+                <div style={{width:14,height:2,background:c,borderRadius:1}}/>{l}
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <Card>
+        <CardTitle>Payment Corridor Performance</CardTitle>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10}}>
+          {cors.map((c,i)=>(
+            <div key={i} style={{background:BG_INSET,borderRadius:8,padding:12,
+              border:`1px solid ${c.status==="green"?ST_BD.green:ST_BD.amber}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                <span style={{fontSize:11,fontWeight:700,color:TX_TITLE}}>{c.name}</span>
+                <Dot status={c.status} size={7}/>
+              </div>
+              <div style={{fontSize:10,color:TX_SUB,marginBottom:6}}>Settlement: {c.st}</div>
+              <div style={{fontSize:15,fontWeight:800,color:ACCENT,marginBottom:2}}>{c.vol}</div>
+              <div style={{fontSize:11,color:TX_BODY,marginBottom:6}}>FX Margin: {c.mg}</div>
+              <div style={{height:5,background:BD_CARD,borderRadius:2}}>
+                <div style={{height:"100%",width:`${c.up}%`,borderRadius:2,
+                  background:c.status==="green"?ST_CLR.green:ST_CLR.amber}}/>
+              </div>
+              <div style={{fontSize:10,color:TX_SUB,marginTop:3}}>{c.up}% uptime</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ── GROUP RISK ────────────────────────────────────────────────────────────
+function RiskGrp(){
+  const sectors=[
+    {name:"FMCG",     pct:28,val:"₦1.17B",color:"#b8922a"},
+    {name:"Oil & Gas",pct:22,val:"₦0.92B",color:"#0a7c7c"},
+    {name:"Pharma",   pct:18,val:"₦0.76B",color:"#5b21b6"},
+    {name:"Aviation", pct:14,val:"₦0.59B",color:"#166534"},
+    {name:"Other",    pct:18,val:"₦0.76B",color:"#6b7280"},
+  ];
+  const credit=[
+    {label:"NPL Ratio",         val:2.8,  max:10, thr:"Threshold: 5%", color:"#16a34a",fmt:v=>`${v}%`},
+    {label:"Capital Adequacy",  val:14.2, max:20, thr:"CBN Min: 10%",  color:"#1d4ed8",fmt:v=>`${v}%`},
+    {label:"Early Delinquency", val:4.1,  max:10, thr:"Watch: 5%",     color:"#d97706",fmt:v=>`${v}%`},
+    {label:"Liquidity Coverage",val:142,  max:200,thr:"Min: 100%",     color:"#7c3aed",fmt:v=>`${v}%`},
+  ];
+  return(
+    <div>
+      <div style={{fontSize:20,fontWeight:800,color:TX_TITLE,marginBottom:3}}>Group Risk & Compliance Monitor</div>
+      <div style={{fontSize:12,color:TX_SUB,marginBottom:18}}>NDPA · FCA · CBN · AML — Proactive monitoring. Zero surprises.</div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:12}}>
+        <Card>
+          <CardTitle>Regulatory Compliance Tracker</CardTitle>
+          {COMPLIANCE_GRP.map((item,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"flex-start",gap:8,
+              padding:"8px 0",borderBottom:i<COMPLIANCE_GRP.length-1?`1px solid ${BD_INNER}`:"none"}}>
+              <div style={{marginTop:2}}><Dot status={item.status} size={8}/></div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:600,color:TX_BODY}}>{item.label}</div>
+                <div style={{fontSize:11,color:TX_SUB,marginTop:1}}>{item.detail}</div>
+              </div>
+              {item.days&&(
+                <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:4,
+                  background:item.days<14?ST_BG.amber:ST_BG.green,
+                  color:item.days<14?ST_CLR.amber:ST_CLR.green,
+                  border:`1px solid ${item.days<14?ST_BD.amber:ST_BD.green}`}}>{item.days}d</span>
+              )}
+            </div>
+          ))}
+        </Card>
+
+        <Card>
+          <CardTitle>Credit Risk Monitor</CardTitle>
+          {credit.map((m,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:12,
+              padding:"8px 0",borderBottom:i<3?`1px solid ${BD_INNER}`:"none"}}>
+              <Donut value={m.val} max={m.max} color={m.color} size={52} stroke={6}/>
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:TX_BODY}}>{m.label}</div>
+                <div style={{fontSize:20,fontWeight:800,color:m.color}}>{m.fmt(m.val)}</div>
+                <div style={{fontSize:10,color:TX_SUB}}>{m.thr}</div>
+              </div>
+            </div>
+          ))}
+        </Card>
+
+        <Card>
+          <CardTitle>Portfolio Segmentation</CardTitle>
+          {sectors.map((s,i)=>(
+            <div key={i} style={{marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                <span style={{fontSize:12,fontWeight:500,color:TX_BODY}}>{s.name}</span>
+                <span style={{fontSize:11,fontWeight:700,color:s.color}}>{s.val}</span>
+              </div>
+              <div style={{height:7,background:"#f0f2f5",borderRadius:3}}>
+                <div style={{height:"100%",width:`${s.pct}%`,background:s.color,
+                  borderRadius:3,transition:`width 1s ease ${i*110}ms`}}/>
+              </div>
+              <div style={{fontSize:10,color:TX_SUB,marginTop:2}}>{s.pct}% of portfolio</div>
+            </div>
+          ))}
+        </Card>
+      </div>
+
+      <Card>
+        <div style={{fontWeight:700,color:TX_TITLE,fontSize:14,marginBottom:3}}>NPL Early Warning — 15-Month Trend</div>
+        <div style={{fontSize:11,color:TX_SUB,marginBottom:14}}>
+          Intervention triggered at 30-day delinquency — not the 90-day regulatory threshold
+        </div>
+        <LineChart datasets={[{lbl:"npl15",data:NPL,color:"#991b1b"}]} h={95} w={700}/>
+        <div style={{display:"flex",gap:20,marginTop:10,flexWrap:"wrap",alignItems:"center"}}>
+          {[[ST_CLR.green,"Safe Zone (<3%)"],[ST_CLR.amber,"Watch Zone (3–5%)"],[ST_CLR.red,"Intervention (>5%)"]].map(([c,l])=>(
+            <div key={l} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:c,fontWeight:500}}>
+              <div style={{width:14,height:2,background:c,borderRadius:1}}/>{l}
+            </div>
+          ))}
+          <div style={{marginLeft:"auto",fontSize:11,color:ST_CLR.green,fontWeight:700}}>
+            ✓ Currently 2.8% — Safe Zone · Trending downward
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ── SUBSIDIARIES ──────────────────────────────────────────────────────────
+function SubsTab({sub,setSub}){
+  const list=sub?[sub]:SUBS;
+  return(
+    <div>
+      <div style={{fontSize:20,fontWeight:800,color:TX_TITLE,marginBottom:3}}>Subsidiary Performance</div>
+      <div style={{fontSize:12,color:TX_SUB,marginBottom:14}}>All 8 entities · Individual KPIs · Click to focus</div>
+
+      <div style={{display:"flex",gap:7,marginBottom:16,flexWrap:"wrap"}}>
+        <FilterBtn active={!sub} onClick={()=>setSub(null)}>All Subsidiaries</FilterBtn>
+        {SUBS.map(s=>(
+          <FilterBtn key={s.id} active={sub?.id===s.id} color={s.color} onClick={()=>setSub(s)}>
+            {s.name.replace("Bluebulb ","BB ")}
+          </FilterBtn>
+        ))}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12}}>
+        {list.map((s)=>{
+          const bd=[...Array(8)].map((_,k)=>s.rev*(0.68+k*0.048));
+          return(
+            <div key={s.id} style={{background:BG_CARD,
+              border:`1px solid ${BD_CARD}`,borderTop:`3px solid ${s.color}`,
+              borderRadius:9,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+                <div>
+                  <div style={{fontSize:15,fontWeight:700,color:s.color}}>{s.name}</div>
+                  <div style={{fontSize:11,color:TX_SUB,marginTop:2}}>{s.type}</div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <Dot status={s.st} size={7}/>
+                  <span style={{fontSize:11,fontWeight:600,
+                    color:s.trend>20?ST_CLR.green:s.trend>10?ST_CLR.amber:"#1d4ed8"}}>
+                    +{s.trend}% MoM
+                  </span>
+                </div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
+                {[{l:s.k1l,v:s.k1},{l:s.k2l,v:s.k2},{l:s.k3l,v:s.k3}].map((k,j)=>(
+                  <div key={j} style={{background:BG_INSET,borderRadius:6,padding:"8px 10px",
+                    border:`1px solid ${BD_CARD}`}}>
+                    <div style={{fontSize:10,color:TX_SUB,marginBottom:2}}>{k.l}</div>
+                    <div style={{fontSize:14,fontWeight:700,color:TX_TITLE}}>{k.v}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontSize:10,color:TX_SUB,marginBottom:2}}>Monthly Revenue</div>
+                  <div style={{fontSize:20,fontWeight:800,color:s.color}}>₦{s.rev}M</div>
+                </div>
+                <Bars data={bd} color={s.color} h={48} w={155}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── SUBSIDIARY RISK MONITOR ───────────────────────────────────────────────
+function SubRisk({initSub}){
+  const [active,setActive]=useState(initSub||SUBS[0].id);
+  const [cat,setCat]=useState("All");
+
+  const curS=SUBS.find(s=>s.id===active)||SUBS[0];
+  const rd=SUB_RISK[active];
+  const cats=["All",...Array.from(new Set(rd.items.map(i=>i.cat)))];
+  const filtered=cat==="All"?rd.items:rd.items.filter(i=>i.cat===cat);
+  const actions=rd.items.filter(i=>i.action);
+  const nRed=rd.items.filter(i=>i.st==="red").length;
+  const nAmber=rd.items.filter(i=>i.st==="amber").length;
+  const nGreen=rd.items.filter(i=>i.st==="green").length;
+
+  const summary=SUBS.map(s=>{
+    const r=SUB_RISK[s.id];
+    return{...s,overall:r.overall,regs:r.regs,
+      nR:r.items.filter(i=>i.st==="red").length,
+      nA:r.items.filter(i=>i.st==="amber").length,
+      nG:r.items.filter(i=>i.st==="green").length,
+      nAct:r.items.filter(i=>i.action).length};
+  });
+
+  return(
+    <div>
+      <div style={{fontSize:20,fontWeight:800,color:TX_TITLE,marginBottom:3}}>
+        Subsidiary Risk & Compliance Monitor
+      </div>
+      <div style={{fontSize:12,color:TX_SUB,marginBottom:16}}>
+        Per-entity risk items · Regulatory obligations · Required actions — click any row to load detail
+      </div>
+
+      {/* GROUP HEATMAP */}
+      <Card style={{marginBottom:14}}>
+        <CardTitle sub="All 8 subsidiaries · click a row to load full detail below">Group Risk Heatmap</CardTitle>
+
+        {/* Header */}
+        <div style={{display:"grid",gridTemplateColumns:"200px 95px 1fr 58px 58px 58px 140px",
+          borderBottom:`2px solid ${BD_INNER}`,paddingBottom:7,marginBottom:4}}>
+          {["Subsidiary","Risk Level","Regulators","Red","Amber","Green","Actions Needed"].map((h,i)=>(
+            <div key={i} style={{fontSize:10,fontWeight:700,color:TX_SUB,
+              padding:"0 6px",textAlign:i>2&&i<6?"center":"left",textTransform:"uppercase",
+              letterSpacing:"0.05em"}}>{h}</div>
+          ))}
+        </div>
+
+        {summary.map((s)=>{
+          const isAct=active===s.id;
+          return(
+            <div key={s.id} onClick={()=>{setActive(s.id);setCat("All");}}
+              style={{display:"grid",gridTemplateColumns:"200px 95px 1fr 58px 58px 58px 140px",
+                cursor:"pointer",borderRadius:7,marginBottom:3,
+                background:isAct?`${s.color}0f`:BG_CARD,
+                border:isAct?`1px solid ${s.color}66`:`1px solid ${BD_INNER}`,
+                transition:"all 0.15s"}}
+              onMouseOver={e=>{if(!isAct){e.currentTarget.style.background=BG_INSET;e.currentTarget.style.borderColor=BD_CARD;}}}
+              onMouseOut={e=>{if(!isAct){e.currentTarget.style.background=BG_CARD;e.currentTarget.style.borderColor=BD_INNER;}}}>
+
+              <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 6px"}}>
+                <div style={{width:8,height:8,borderRadius:2,background:s.color,flexShrink:0}}/>
+                <span style={{fontSize:12,fontWeight:isAct?700:500,
+                  color:isAct?s.color:TX_BODY,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                  {s.name.replace("Bluebulb ","BB ")}
+                </span>
+              </div>
+
+              <div style={{display:"flex",alignItems:"center",padding:"8px 6px"}}>
+                <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:4,
+                  background:ST_BG[s.overall],color:ST_CLR[s.overall],border:`1px solid ${ST_BD[s.overall]}`}}>
+                  {s.overall.toUpperCase()}
+                </span>
+              </div>
+
+              <div style={{display:"flex",alignItems:"center",gap:4,padding:"8px 6px",flexWrap:"wrap"}}>
+                {s.regs.map(r=>(
+                  <span key={r} style={{fontSize:9,color:TX_SUB,background:BG_DEEP,
+                    borderRadius:3,padding:"2px 5px",border:`1px solid ${BD_CARD}`,fontWeight:500}}>{r}</span>
+                ))}
+              </div>
+
+              {[{n:s.nR,c:ST_CLR.red},{n:s.nA,c:ST_CLR.amber},{n:s.nG,c:ST_CLR.green}].map(({n,c},i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"8px 4px"}}>
+                  <span style={{fontSize:14,fontWeight:800,color:n>0?c:TX_FAINT}}>{n}</span>
+                </div>
+              ))}
+
+              <div style={{display:"flex",alignItems:"center",padding:"8px 6px"}}>
+                {s.nAct>0
+                  ?<span style={{fontSize:11,color:ST_CLR.amber,fontWeight:600}}>
+                     {s.nAct} item{s.nAct>1?"s":""} need attention
+                   </span>
+                  :<span style={{fontSize:11,color:ST_CLR.green,fontWeight:500}}>✓ No actions</span>
+                }
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+
+      {/* DETAIL */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 275px",gap:12}}>
+
+        {/* Risk items table */}
+        <div style={{background:BG_CARD,border:`1px solid ${BD_CARD}`,
+          borderTop:`3px solid ${curS.color}`,borderRadius:10,padding:18,
+          boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+            <div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:10,height:10,borderRadius:2,background:curS.color}}/>
+                <span style={{fontSize:16,fontWeight:700,color:curS.color}}>{curS.name}</span>
+                <span style={{fontSize:11,background:`${curS.color}15`,color:curS.color,
+                  padding:"2px 8px",borderRadius:3,border:`1px solid ${curS.color}44`,fontWeight:600}}>
+                  {curS.type}
+                </span>
+              </div>
+              <div style={{fontSize:11,color:TX_SUB,marginTop:5}}>
+                Regulators: <span style={{fontWeight:600,color:TX_BODY}}>{rd.regs.join(" · ")}</span>
+              </div>
+            </div>
+            <span style={{fontSize:12,fontWeight:700,padding:"4px 12px",borderRadius:6,
+              background:ST_BG[rd.overall],color:ST_CLR[rd.overall],
+              border:`1px solid ${ST_BD[rd.overall]}`}}>
+              Overall: {rd.overall.toUpperCase()}
+            </span>
+          </div>
+
+          {/* Category filter */}
+          <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+            {cats.map(c=>(
+              <FilterBtn key={c} active={cat===c} color={CAT_CLR[c]} onClick={()=>setCat(c)}>{c}</FilterBtn>
+            ))}
+          </div>
+
+          {/* Column headers */}
+          <div style={{display:"grid",gridTemplateColumns:"90px 1fr 80px",
+            gap:8,padding:"0 8px",marginBottom:6,
+            borderBottom:`1px solid ${BD_INNER}`,paddingBottom:6}}>
+            {["Category","Risk Item · Detail","Status"].map(h=>(
+              <div key={h} style={{fontSize:10,fontWeight:700,color:TX_SUB,
+                textTransform:"uppercase",letterSpacing:"0.04em"}}>{h}</div>
+            ))}
+          </div>
+
+          {filtered.map((item,i)=>(
+            <div key={i} style={{display:"grid",gridTemplateColumns:"90px 1fr 80px",
+              gap:8,padding:"10px 8px",borderRadius:6,marginBottom:2,
+              background:i%2===0?BG_INSET:BG_CARD,
+              borderLeft:`3px solid ${CAT_CLR[item.cat]||BD_CARD}`}}>
+
+              <div style={{display:"flex",alignItems:"flex-start",paddingTop:1}}>
+                <span style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:3,
+                  background:`${CAT_CLR[item.cat]||"#6b7280"}15`,
+                  color:CAT_CLR[item.cat]||TX_SUB,
+                  border:`1px solid ${CAT_CLR[item.cat]||"#6b7280"}44`,
+                  textTransform:"uppercase",letterSpacing:"0.03em"}}>
+                  {item.cat}
+                </span>
+              </div>
+
+              <div>
+                <div style={{fontSize:12,fontWeight:600,color:TX_TITLE,marginBottom:2}}>{item.label}</div>
+                <div style={{fontSize:11,color:TX_SUB,lineHeight:1.4}}>{item.detail}</div>
+                {item.action&&(
+                  <div style={{display:"flex",alignItems:"center",gap:5,marginTop:5,
+                    background:ST_BG.amber,borderRadius:4,padding:"3px 7px",
+                    border:`1px solid ${ST_BD.amber}`,display:"inline-flex"}}>
+                    <span style={{fontSize:9}}>▶</span>
+                    <span style={{fontSize:10,color:ST_CLR.amber,fontWeight:600}}>{item.action}</span>
+                  </div>
+                )}
+              </div>
+
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"flex-end"}}>
+                <span style={{fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:4,
+                  background:ST_BG[item.st],color:ST_CLR[item.st],
+                  border:`1px solid ${ST_BD[item.st]}`}}>
+                  {ST_LBL[item.st]}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Right panel */}
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+
+          {/* Score card */}
+          <Card>
+            <div style={{fontWeight:700,color:TX_TITLE,fontSize:13,marginBottom:12}}>
+              Risk Score · {curS.name.replace("Bluebulb ","BB ")}
+            </div>
+            {[
+              {label:"Issues",    sub:"Red items",   n:nRed,   color:ST_CLR.red,  bg:ST_BG.red,  bd:ST_BD.red},
+              {label:"Watch",     sub:"Amber items", n:nAmber, color:ST_CLR.amber,bg:ST_BG.amber,bd:ST_BD.amber},
+              {label:"Pass",      sub:"Green items", n:nGreen, color:ST_CLR.green,bg:ST_BG.green,bd:ST_BD.green},
+            ].map(({label,sub,n,color,bg,bd})=>(
+              <div key={label} style={{display:"flex",alignItems:"center",
+                justifyContent:"space-between",padding:"8px 0",
+                borderBottom:`1px solid ${BD_INNER}`}}>
+                <div>
+                  <div style={{fontSize:12,fontWeight:600,color:TX_BODY}}>{label}</div>
+                  <div style={{fontSize:10,color:TX_SUB}}>{sub}</div>
+                </div>
+                <span style={{fontSize:22,fontWeight:800,color,background:bg,
+                  padding:"2px 12px",borderRadius:6,border:`1px solid ${bd}`}}>{n}</span>
+              </div>
+            ))}
+            <div style={{marginTop:10,height:8,background:"#f0f2f5",borderRadius:4,
+              overflow:"hidden",display:"flex"}}>
+              {[{n:nRed,c:ST_CLR.red},{n:nAmber,c:ST_CLR.amber},{n:nGreen,c:ST_CLR.green}]
+                .filter(x=>x.n>0)
+                .map(({n,c},i)=>(
+                  <div key={i} style={{height:"100%",flex:n,background:c}}/>
+              ))}
+            </div>
+            <div style={{fontSize:10,color:TX_SUB,marginTop:5,textAlign:"center"}}>
+              {rd.items.length} total risk items assessed
+            </div>
+          </Card>
+
+          {/* Actions panel */}
+          <div style={{background:BG_CARD,border:`1px solid ${ST_BD.amber}`,
+            borderRadius:10,padding:16,flex:1,
+            boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:4}}>
+              <div style={{width:8,height:8,borderRadius:2,background:ST_CLR.amber}}/>
+              <div style={{fontWeight:700,color:TX_TITLE,fontSize:13}}>Actions Required</div>
+            </div>
+            <div style={{fontSize:11,color:TX_SUB,marginBottom:12}}>
+              {actions.length===0?"All clear — no actions outstanding":`${actions.length} item${actions.length>1?"s":""} need attention`}
+            </div>
+
+            {actions.length===0
+              ?<div style={{textAlign:"center",padding:"20px 0"}}>
+                 <div style={{fontSize:24,marginBottom:6}}>✓</div>
+                 <div style={{fontSize:12,color:ST_CLR.green,fontWeight:600}}>No actions required</div>
+               </div>
+              :actions.map((item,i)=>(
+                <div key={i} style={{padding:"10px 0",
+                  borderBottom:i<actions.length-1?`1px solid ${BD_INNER}`:"none"}}>
+                  <div style={{fontSize:12,fontWeight:600,color:TX_TITLE,marginBottom:4}}>{item.label}</div>
+                  <div style={{display:"inline-flex",alignItems:"center",gap:5,
+                    background:ST_BG.amber,borderRadius:4,padding:"3px 8px",
+                    border:`1px solid ${ST_BD.amber}`,marginBottom:5}}>
+                    <span style={{fontSize:9}}>▶</span>
+                    <span style={{fontSize:11,color:ST_CLR.amber,fontWeight:600}}>{item.action}</span>
+                  </div>
+                  <div>
+                    <span style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:3,
+                      background:`${CAT_CLR[item.cat]||"#6b7280"}15`,
+                      color:CAT_CLR[item.cat]||TX_SUB,
+                      border:`1px solid ${CAT_CLR[item.cat]||"#6b7280"}33`,
+                      textTransform:"uppercase",letterSpacing:"0.03em"}}>
+                      {item.cat}
+                    </span>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const root=ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App/>);
+</script>
+</body>
+</html>
